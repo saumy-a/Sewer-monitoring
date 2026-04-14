@@ -1,0 +1,24 @@
+# Sensitive credentials - DO NOT COMMIT
+serviceAccountKey.json
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Virtual environment
+venv/
+
+# ML model binaries (large files – regenerate with train_model.py)
+model.pkl
+label_encoder.pkl
+
+# Database
+sensor_data.db
+
+# Exported data files
+firebase_data.json
+firebase_data.csv
+
+# macOS
+.DS_Store

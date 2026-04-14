@@ -1,6 +1,13 @@
 # Sensitive credentials - DO NOT COMMIT
 serviceAccountKey.json
 
+# Large raw datasets (download separately)
+AirQualityUCI.csv
+iot_telemetry_data.csv
+
+# Generated files (reproducible via prepare_dataset.py)
+training_data.csv
+
 # Python cache
 __pycache__/
 *.pyc

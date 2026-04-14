@@ -7,8 +7,26 @@ import pandas as pd
 import joblib
 
 # ===== LOAD ML MODEL =====
-model = joblib.load("model.pkl")
-le    = joblib.load("label_encoder.pkl")
+model        = joblib.load("model.pkl")
+le           = joblib.load("label_encoder.pkl")
+FEATURE_COLS = joblib.load("feature_columns.pkl")  # ordered feature list
+
+def build_features(d: dict) -> pd.DataFrame:
+    """Convert raw ESP32 payload into the feature vector the model expects.
+    Computes engineered features (gas_ratio, env_index) from base readings.
+    """
+    air      = float(d.get('air',      0) or 0)
+    methane  = float(d.get('methane',  0) or 0)
+    temp     = float(d.get('temp',    25) or 25)
+    humidity = float(d.get('humidity', 60) or 60)
+    return pd.DataFrame([{
+        'temp':      temp,
+        'humidity':  humidity,
+        'air':       air,
+        'methane':   methane,
+        'gas_ratio': air / (methane + 1),
+        'env_index': (temp * humidity) / 100,
+    }])[FEATURE_COLS]  # enforce correct column order
 
 # ===== FIREBASE SETUP =====
 cred = credentials.Certificate("serviceAccountKey.json")
@@ -54,16 +72,9 @@ def dashboard():
 def receive_data():
     data = request.json
 
-    # ML prediction
-    features_df = pd.DataFrame([{
-        'temp':     data.get('temp'),
-        'humidity': data.get('humidity'),
-        'air':      data.get('air'),
-        'methane':  data.get('methane'),
-        'distance': data.get('distance'),
-        'flow':     data.get('flow')
-    }])
-    prediction = model.predict(features_df)
+    # ML prediction using engineered features
+    features_df = build_features(data)
+    prediction  = model.predict(features_df)
     data['status'] = le.inverse_transform(prediction)[0]
 
     print(f"[POST /data] Received & Predicted: {data}")

@@ -130,11 +130,14 @@ void loop() {
   digitalWrite(TRIG_PIN, LOW);
 
   long duration = pulseIn(ECHO_PIN, HIGH, 30000UL);
-  float distance = -1.0f;
+  float distance = -1.0f; // this will now store Water Depth
   if (duration > 0) {
-    distance = duration * 0.034f / 2.0f;
+    float rawDistance = duration * 0.034f / 2.0f; // distance from lid to water
+    distance = 11.0f - rawDistance; // calculate water depth
+    if (distance < 0) distance = 0.0f; // clamp empty
+    if (distance > 11.0f) distance = 11.0f; // clamp full
   } else {
-    Serial.println("[WARN] Ultrasonic timeout — distance set to -1 (invalid)");
+    Serial.println("[WARN] Ultrasonic timeout — depth set to -1 (invalid)");
   }
 
   // ===== SERIAL DEBUG =====

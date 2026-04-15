@@ -137,11 +137,11 @@ THRESHOLDS = {
     'ch4_blockage':      200,   # high concentration/stagnant
     'ch4_danger':       1000,   # extreme accumulation
 
-    # Water level (distance from sensor to water surface, cm)
-    # Lower distance = higher water = worse. Based on 11cm total container height.
-    'distance_danger':     3,   # water is very close to sensor
-    'distance_blockage':   5,   # halfway filled
-    'distance_moderate':   8,   # slightly elevated
+    # Water Level (0: empty, 11: full)
+    # Higher value = worse (rising water)
+    'distance_danger':     8,   
+    'distance_blockage':   6,   
+    'distance_moderate':   3,   
 
     # Flow rate (L/min)
     # Lower flow = worse (blockage)
@@ -171,12 +171,12 @@ def rule_based_override(data: dict, ml_status: str) -> tuple[str, str]:
         return 'DANGER', f'RULE:ch4={methane}>={T["ch4_danger"]}'
     if air >= T['air_danger']:
         return 'DANGER', f'RULE:air={air}>={T["air_danger"]}'
-    if 0 < distance <= T['distance_danger']:
-        return 'DANGER', f'RULE:distance={distance:.1f}<={T["distance_danger"]}cm'
+    if distance >= T['distance_danger']:
+        return 'DANGER', f'RULE:water_level={distance:.1f}cm>={T["distance_danger"]}'
 
     # ── BLOCKAGE overrides ─────────────────────────────────────────
-    if 0 < distance <= T['distance_blockage']:
-        return 'BLOCKAGE', f'RULE:distance={distance:.1f}<={T["distance_blockage"]}cm'
+    if distance >= T['distance_blockage']:
+        return 'BLOCKAGE', f'RULE:water_level={distance:.1f}cm>={T["distance_blockage"]}'
     if (methane >= T['ch4_blockage'] or air >= T['air_blockage']) and flow < T['flow_blockage']:
         return 'BLOCKAGE', f'RULE:gas_elevated+flow={flow:.2f}<{T["flow_blockage"]}'
 
@@ -184,7 +184,7 @@ def rule_based_override(data: dict, ml_status: str) -> tuple[str, str]:
     if (flow >= 5.0
             and air  < T['air_moderate']
             and methane < T['ch4_moderate']
-            and (distance < 0 or distance > T['distance_moderate'])):
+            and (distance < 0 or distance < T['distance_moderate'])):
         if ml_status in ('BLOCKAGE', 'DANGER'):
             return 'SAFE', f'RULE:flow={flow:.2f}+all_sensors_ok'
 

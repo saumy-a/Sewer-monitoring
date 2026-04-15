@@ -138,10 +138,10 @@ THRESHOLDS = {
     'ch4_danger':       1000,   # extreme accumulation
 
     # Water level (distance from sensor to water surface, cm)
-    # Lower distance = higher water = worse
-    'distance_danger':    15,   # pipe nearly full or sensor submerged
-    'distance_blockage':  30,   # high water
-    'distance_moderate':  60,   # elevated water
+    # Lower distance = higher water = worse. Based on 11cm total container height.
+    'distance_danger':     3,   # water is very close to sensor
+    'distance_blockage':   5,   # halfway filled
+    'distance_moderate':   8,   # slightly elevated
 
     # Flow rate (L/min)
     # Lower flow = worse (blockage)

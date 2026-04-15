@@ -21,6 +21,21 @@ Fixes applied vs original:
 
   FIX 5 — distance = -1.0 sentinel (from fixed ESP32 code) must not be fed
            to the model as a real reading. Handled gracefully.
+
+  FIX 6 — ML model does not use flow or distance as features (they were not
+           in the IoT training dataset and were excluded from TRAIN_FEATURES).
+           This caused two observable bugs:
+             a) methane=1400 (well above DANGER threshold 700) predicted BLOCKAGE
+                because the model was trained on noise-perturbed data and extreme
+                values near the 1500 clip boundary were ambiguous.
+             b) flow=10 L/min had zero influence on prediction — system showed
+                BLOCKAGE even with healthy flow, confusing operators.
+           Fix: rule_based_override() applies hard threshold checks on ALL
+           sensors (including flow & distance) AFTER the ML prediction.
+           ML is used for nuanced mid-range cases; rules catch clear-cut
+           extreme violations that the model consistently misjudges.
+           A 'decision' field is added to the response so you can see whether
+           ML or rules determined the final status.
 """
 
 from flask import Flask, request, jsonify, render_template, g
@@ -89,13 +104,61 @@ def close_db(error):
 # FIX 1: feature engineering — must match train_model.py exactly
 # ───────────────────────────────────────────────
 def engineer_features(row: dict) -> dict:
-    air     = row.get('air', 0)
-    methane = row.get('methane', 0)
-    temp    = row.get('temp', 25)
+    air      = row.get('air', 0)
+    methane  = row.get('methane', 0)
+    temp     = row.get('temp', 25)
     humidity = row.get('humidity', 60)
     row['gas_ratio'] = air / (methane + 1)
     row['env_index'] = (temp * humidity) / 100
     return row
+
+
+# ───────────────────────────────────────────────
+# FIX 6: rule-based override for clear-cut violations
+#
+# The ML model was trained without flow/distance features and
+# sometimes mislabels extreme gas readings near the training
+# data clip boundary. These hard rules correct the most common
+# failure modes and ensure physical safety constraints are
+# always respected, regardless of ML output.
+# ───────────────────────────────────────────────
+def rule_based_override(data: dict, ml_status: str) -> tuple[str, str]:
+    """
+    Returns (final_status, decision_source) where decision_source is
+    either 'ML' or 'RULE:<reason>'.
+    """
+    air      = data.get('air',      0)
+    methane  = data.get('methane',  0)
+    distance = data.get('distance', -1.0)
+    flow     = data.get('flow',     0.0)
+
+    # ── DANGER overrides (must escalate regardless of ML) ────────────
+    # Methane far above DANGER threshold (700 ppm)
+    if methane > 700:
+        return 'DANGER', f'RULE:methane={methane}ppm>700'
+
+    # Air quality far above DANGER threshold (600 ppm)
+    if air > 600:
+        return 'DANGER', f'RULE:air={air}ppm>600'
+
+    # Water level critically high (distance < 20 cm, sensor valid)
+    if 0 < distance < 20:
+        return 'DANGER', f'RULE:distance={distance:.1f}cm<20'
+
+    # ── BLOCKAGE override ────────────────────────────────────────────
+    # Gas elevated into blockage zone AND flow completely dead
+    if (methane > 450 or air > 350) and flow < 1.0:
+        return 'BLOCKAGE', f'RULE:gas_elevated+flow={flow:.2f}<1'
+
+    # ── SAFE override ────────────────────────────────────────────────
+    # Healthy flow + both gas sensors clearly in safe zone
+    # ML must not call this BLOCKAGE or DANGER
+    if flow >= 6.0 and air < 200 and methane < 250:
+        if ml_status in ('BLOCKAGE', 'DANGER'):
+            return 'SAFE', f'RULE:flow={flow:.2f}+gas_safe'
+
+    # ── No override — trust the ML ───────────────────────────────────
+    return ml_status, 'ML'
 
 def safe_float(val, fallback=0.0):
     """Return fallback if val is None, NaN, or not numeric."""
@@ -140,10 +203,16 @@ def receive_data():
         features_df = pd.DataFrame([{k: data[k] for k in TRAIN_FEATURES}])
 
         prediction = model.predict(features_df)
-        status = le.inverse_transform(prediction)[0]
-        data['status'] = status
+        ml_status  = le.inverse_transform(prediction)[0]
 
-        print(f"[POST /data] {data}")
+        # FIX 6: apply hard-rule override — catches extreme readings the
+        # ML model consistently misjudges (see module docstring)
+        status, decision = rule_based_override(data, ml_status)
+        data['status']   = status
+        data['decision'] = decision   # stored for transparency / debugging
+
+        print(f"[POST /data] ML={ml_status} → Final={status} ({decision}) | "
+              f"air={data['air']} CH4={data['methane']} dist={data['distance']:.1f} flow={data['flow']:.2f}")
 
         # Store in Firebase (exclude internal keys the DB doesn't need)
         fb_payload = {k: v for k, v in data.items() if k != 'dht_ok'}
@@ -164,7 +233,7 @@ def receive_data():
         ))
         db.commit()
 
-        return jsonify({"status": "stored", "prediction": status})
+        return jsonify({"status": "stored", "prediction": status, "decision": decision})
 
     except Exception as e:
         traceback.print_exc()

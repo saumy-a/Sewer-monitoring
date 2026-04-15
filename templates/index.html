@@ -4,90 +4,14 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Smart Sewer Monitor | IoT Dashboard</title>
-  <meta name="description" content="Real-time IoT dashboard for Smart Sewer Monitoring System. Tracks temperature, humidity, air quality, methane, water level, and flow rate with AI-based status predictions." />
+  <meta name="description" content="Real-time IoT dashboard for Smart Sewer Monitoring System with safe-range indicators and full history." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
   <style>
-    /* ── Screen Flash Overlay ─────────────── */
-    #status-flash {
-      position: fixed;
-      inset: 0;
-      pointer-events: none;
-      z-index: 9999;
-      opacity: 0;
-      border: 4px solid transparent;
-      border-radius: 0;
-      transition: opacity 0s;
-    }
-    #status-flash.flash {
-      animation: screenFlash 0.7s ease-out forwards;
-    }
-    @keyframes screenFlash {
-      0%   { opacity: 1; }
-      100% { opacity: 0; }
-    }
-
-    /* ── Toast Notification ───────────────── */
-    #toast-wrap {
-      position: fixed;
-      top: 18px;
-      right: 18px;
-      z-index: 10000;
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-      pointer-events: none;
-    }
-    .toast {
-      display: flex;
-      align-items: flex-start;
-      gap: 12px;
-      background: #1c2128;
-      border: 0.5px solid rgba(255,255,255,0.12);
-      border-radius: 10px;
-      padding: 13px 16px;
-      min-width: 260px;
-      max-width: 320px;
-      box-shadow: 0 8px 32px rgba(0,0,0,0.5);
-      pointer-events: auto;
-      transform: translateX(110%);
-      opacity: 0;
-      transition: transform 0.35s cubic-bezier(0.34,1.56,0.64,1), opacity 0.3s;
-    }
-    .toast.show {
-      transform: translateX(0);
-      opacity: 1;
-    }
-    .toast.hide {
-      transform: translateX(110%);
-      opacity: 0;
-    }
-    .toast-icon { font-size: 20px; flex-shrink: 0; margin-top: 1px; }
-    .toast-body { flex: 1; }
-    .toast-title { font-size: 13px; font-weight: 700; margin-bottom: 3px; }
-    .toast-msg   { font-size: 11px; color: #7d8590; line-height: 1.4; }
-    .toast-bar   { position: absolute; bottom: 0; left: 0; height: 3px; border-radius: 0 0 10px 10px; animation: toastBar 4s linear forwards; }
-    .toast { position: relative; overflow: hidden; }
-    @keyframes toastBar { from { width: 100%; } to { width: 0; } }
-
-    /* toast color themes */
-    .toast-SAFE     { border-left: 3px solid #1d9e75; }
-    .toast-MODERATE { border-left: 3px solid #ef9f27; }
-    .toast-BLOCKAGE { border-left: 3px solid #f97316; }
-    .toast-DANGER   { border-left: 3px solid #e24b4a; }
-    .toast-DANGER .toast-title { color: #e24b4a; }
-    .toast-BLOCKAGE .toast-title { color: #f97316; }
-    .toast-MODERATE .toast-title { color: #ef9f27; }
-    .toast-SAFE .toast-title    { color: #1d9e75; }
-    .toast-SAFE .toast-bar    { background: #1d9e75; }
-    .toast-MODERATE .toast-bar { background: #ef9f27; }
-    .toast-BLOCKAGE .toast-bar { background: #f97316; }
-    .toast-DANGER .toast-bar   { background: #e24b4a; }
-    /* ── Reset ─────────────────────────────── */
+    /* ── Reset ──────────────────────────────────── */
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     html { scroll-behavior: smooth; }
-
     body {
       background: #0d1117;
       font-family: 'Inter', system-ui, sans-serif;
@@ -95,64 +19,64 @@
       min-height: 100vh;
     }
 
-    .dash { padding: 20px; max-width: 1400px; margin: 0 auto; }
+    /* ── Page Wrapper ───────────────────────────── */
+    .app { display: flex; flex-direction: column; min-height: 100vh; }
+    .dash { padding: 18px 20px 32px; max-width: 1400px; margin: 0 auto; width: 100%; }
 
-    /* ── Header ────────────────────────────── */
+    /* ── Header ─────────────────────────────────── */
     .header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 24px;
-      padding-bottom: 16px;
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 20px; padding-bottom: 14px;
       border-bottom: 0.5px solid rgba(255,255,255,0.1);
-      flex-wrap: wrap;
-      gap: 12px;
+      flex-wrap: wrap; gap: 12px;
     }
     .logo { display: flex; align-items: center; gap: 10px; }
     .logo-icon {
-      width: 34px; height: 34px;
-      background: #1a3d2e;
-      border-radius: 8px;
-      display: flex; align-items: center; justify-content: center;
-      flex-shrink: 0;
+      width: 34px; height: 34px; background: #1a3d2e;
+      border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;
     }
     .logo-icon svg { width: 18px; height: 18px; }
-    .logo-title  { font-size: 15px; font-weight: 600; color: #e6edf3; }
-    .logo-sub    { font-size: 11px; color: #7d8590; margin-top: 1px; }
+    .logo-title { font-size: 15px; font-weight: 600; }
+    .logo-sub   { font-size: 11px; color: #7d8590; margin-top: 1px; }
+
+    /* ── Nav Tabs ───────────────────────────────── */
+    .nav-tabs {
+      display: flex; gap: 4px; background: rgba(255,255,255,0.04);
+      border: 0.5px solid rgba(255,255,255,0.08);
+      border-radius: 10px; padding: 4px;
+    }
+    .nav-tab {
+      padding: 6px 18px; border-radius: 7px; font-size: 12px; font-weight: 500;
+      cursor: pointer; border: none; background: none; color: #7d8590;
+      transition: background 0.18s, color 0.18s; font-family: inherit;
+    }
+    .nav-tab.active { background: #1c2128; color: #e6edf3; }
+    .nav-tab:hover:not(.active) { color: #b0bec5; }
+
+    /* ── Header Right ───────────────────────────── */
     .header-right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
     .live-badge {
       display: flex; align-items: center; gap: 6px;
-      background: rgba(29,158,117,0.1);
-      border: 0.5px solid rgba(29,158,117,0.3);
-      border-radius: 20px;
-      padding: 4px 12px;
-      font-size: 12px;
+      background: rgba(29,158,117,0.1); border: 0.5px solid rgba(29,158,117,0.3);
+      border-radius: 20px; padding: 4px 12px; font-size: 12px;
     }
-    .live-badge.offline {
-      background: rgba(226,75,74,0.1);
-      border-color: rgba(226,75,74,0.3);
-    }
-    .ldot {
-      width: 7px; height: 7px; border-radius: 50%;
-      background: #1d9e75;
-      animation: dPulse 2s ease infinite;
-    }
+    .live-badge.offline { background: rgba(226,75,74,0.1); border-color: rgba(226,75,74,0.3); }
+    .ldot { width: 7px; height: 7px; border-radius: 50%; background: #1d9e75; animation: dPulse 2s ease infinite; }
     .ldot.off { background: #e24b4a; animation: none; }
     @keyframes dPulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
     .live-txt { color: #1d9e75; font-weight: 500; }
     .live-txt.off { color: #e24b4a; }
     .last-upd { font-size: 11px; color: #7d8590; }
 
-    /* ── Status Banner ─────────────────────── */
+    /* ── Pages ──────────────────────────────────── */
+    .page { display: none; }
+    .page.active { display: block; }
+
+    /* ── Status Banner ──────────────────────────── */
     .status-banner {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      padding: 12px 16px;
-      border-radius: 10px;
-      margin-bottom: 20px;
-      transition: background 0.35s, border-color 0.35s;
-      flex-wrap: wrap;
+      display: flex; align-items: center; gap: 12px;
+      padding: 12px 16px; border-radius: 10px; margin-bottom: 18px;
+      transition: background 0.35s, border-color 0.35s; flex-wrap: wrap;
     }
     .status-banner.SAFE     { background: rgba(29,158,117,0.1);  border: 0.5px solid rgba(29,158,117,0.3); }
     .status-banner.MODERATE { background: rgba(239,159,39,0.1);  border: 0.5px solid rgba(239,159,39,0.3); }
@@ -161,12 +85,8 @@
     .status-banner.OFFLINE  { background: rgba(125,133,144,0.08); border: 0.5px solid rgba(125,133,144,0.2); }
 
     .status-badge {
-      padding: 3px 12px;
-      border-radius: 20px;
-      font-size: 11px; font-weight: 600;
-      letter-spacing: 0.5px;
-      white-space: nowrap;
-      transition: all 0.35s;
+      padding: 3px 12px; border-radius: 20px; font-size: 11px; font-weight: 600;
+      letter-spacing: 0.5px; white-space: nowrap; transition: all 0.35s;
     }
     .status-badge.SAFE     { background: rgba(29,158,117,0.2);  color: #1d9e75; }
     .status-badge.MODERATE { background: rgba(239,159,39,0.2);  color: #ef9f27; }
@@ -174,194 +94,285 @@
     .status-badge.DANGER   { background: rgba(226,75,74,0.2);   color: #e24b4a; animation: dBadge 0.9s ease infinite; }
     .status-badge.OFFLINE  { background: rgba(125,133,144,0.15); color: #7d8590; }
     @keyframes dBadge { 0%,100%{opacity:1} 50%{opacity:0.55} }
-
     .status-icon { font-size: 17px; }
     .status-msg  { font-size: 13px; color: #b0bec5; }
 
-    /* ── Sensor Grid ───────────────────────── */
+    /* ── Sensor Grid ────────────────────────────── */
     .sensor-grid {
       display: grid;
       grid-template-columns: repeat(3, minmax(0,1fr));
-      gap: 12px;
-      margin-bottom: 20px;
+      gap: 12px; margin-bottom: 18px;
     }
     @media (max-width: 640px) { .sensor-grid { grid-template-columns: repeat(2,minmax(0,1fr)); } }
     @media (max-width: 380px) { .sensor-grid { grid-template-columns: 1fr; } }
 
     .sensor-card {
-      background: #161b22;
-      border: 0.5px solid rgba(255,255,255,0.08);
-      border-radius: 10px;
-      padding: 14px 16px;
-      transition: border-color 0.2s;
+      background: #161b22; border: 0.5px solid rgba(255,255,255,0.08);
+      border-radius: 10px; padding: 14px 16px 12px; transition: border-color 0.2s;
     }
     .sensor-card:hover { border-color: rgba(255,255,255,0.16); }
-
     .sensor-label {
-      font-size: 10px;
-      color: #7d8590;
-      text-transform: uppercase;
-      letter-spacing: 0.6px;
-      margin-bottom: 6px;
-      font-weight: 500;
+      font-size: 10px; color: #7d8590; text-transform: uppercase;
+      letter-spacing: 0.6px; margin-bottom: 6px; font-weight: 500;
     }
-    .sensor-value {
-      font-size: 24px;
-      font-weight: 600;
-      line-height: 1.1;
-      letter-spacing: -0.5px;
+    .sensor-value { font-size: 24px; font-weight: 600; line-height: 1.1; letter-spacing: -0.5px; }
+    .sensor-unit  { font-size: 11px; color: #7d8590; margin-top: 2px; }
+
+    /* ── Safe Range Bar ─────────────────────────── */
+    .range-bar-wrap { margin-top: 10px; }
+    .range-bar {
+      position: relative; height: 5px; border-radius: 3px;
+      background: rgba(255,255,255,0.07); overflow: visible; margin-bottom: 5px;
     }
-    .sensor-unit { font-size: 11px; color: #7d8590; margin-top: 3px; }
+    /* colored zone segments inside the bar */
+    .range-seg {
+      position: absolute; top: 0; height: 100%; border-radius: 3px;
+    }
+    /* current value needle */
+    .range-needle {
+      position: absolute; top: -4px; width: 3px; height: 13px;
+      background: #fff; border-radius: 2px;
+      transform: translateX(-50%);
+      transition: left 0.7s ease;
+      box-shadow: 0 0 4px rgba(255,255,255,0.6);
+    }
+    .range-labels {
+      display: flex; justify-content: space-between;
+      font-size: 9px; color: #556070; margin-top: 3px;
+    }
+    .range-status {
+      font-size: 9px; font-weight: 600; margin-top: 3px;
+      display: flex; align-items: center; gap: 4px;
+    }
+    .range-status.safe     { color: #1d9e75; }
+    .range-status.moderate { color: #ef9f27; }
+    .range-status.blockage { color: #f97316; }
+    .range-status.danger   { color: #e24b4a; }
+    .range-dot {
+      width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0;
+    }
 
-    .sensor-bar { height: 3px; border-radius: 2px; background: rgba(255,255,255,0.07); margin-top: 10px; overflow: hidden; }
-    .sensor-bar-fill { height: 100%; border-radius: 2px; transition: width 0.8s ease; }
-
-    /* sensor colors */
+    /* ── sensor val colors ──────────────────────── */
     .val-temp    { color: #ef9f27; }
     .val-humidity{ color: #378add; }
     .val-air     { color: #e24b4a; }
     .val-methane { color: #d4537e; }
     .val-distance{ color: #1d9e75; }
     .val-flow    { color: #7f77dd; }
-    .bar-temp    { background: #ef9f27; }
-    .bar-humidity{ background: #378add; }
-    .bar-air     { background: #e24b4a; }
-    .bar-methane { background: #d4537e; }
-    .bar-distance{ background: #1d9e75; }
-    .bar-flow    { background: #7f77dd; }
 
-    /* ── Chart Row ─────────────────────────── */
+    /* ── Charts Row ─────────────────────────────── */
     .charts-row {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0,1fr));
-      gap: 12px;
-      margin-bottom: 20px;
+      display: grid; grid-template-columns: repeat(2,minmax(0,1fr));
+      gap: 12px; margin-bottom: 18px;
     }
     @media (max-width: 640px) { .charts-row { grid-template-columns: 1fr; } }
-
     .chart-card {
-      background: #161b22;
-      border: 0.5px solid rgba(255,255,255,0.08);
-      border-radius: 10px;
-      padding: 14px 16px;
+      background: #161b22; border: 0.5px solid rgba(255,255,255,0.08);
+      border-radius: 10px; padding: 14px 16px;
     }
     .chart-title {
-      font-size: 11px;
-      color: #7d8590;
-      text-transform: uppercase;
-      letter-spacing: 0.6px;
-      font-weight: 500;
-      margin-bottom: 14px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
+      font-size: 11px; color: #7d8590; text-transform: uppercase;
+      letter-spacing: 0.6px; font-weight: 500; margin-bottom: 12px;
+      display: flex; align-items: center; gap: 8px;
     }
     .chart-legend { display: flex; gap: 10px; margin-left: auto; }
     .cl-item { display: flex; align-items: center; gap: 5px; font-size: 10px; color: #7d8590; }
     .cl-dot  { width: 7px; height: 7px; border-radius: 50%; }
 
-    /* ── Bottom Row ────────────────────────── */
+    /* ── Bottom Row ─────────────────────────────── */
     .bottom-row {
-      display: grid;
-      grid-template-columns: minmax(0,2fr) minmax(0,1fr);
-      gap: 12px;
+      display: grid; grid-template-columns: minmax(0,2fr) minmax(0,1fr); gap: 12px;
     }
     @media (max-width: 720px) { .bottom-row { grid-template-columns: 1fr; } }
 
-    /* History table */
+    /* ── Cards ──────────────────────────────────── */
     .history-card, .api-card {
-      background: #161b22;
-      border: 0.5px solid rgba(255,255,255,0.08);
-      border-radius: 10px;
-      padding: 14px 16px;
+      background: #161b22; border: 0.5px solid rgba(255,255,255,0.08);
+      border-radius: 10px; padding: 14px 16px;
     }
     .section-title {
-      font-size: 11px;
-      color: #7d8590;
-      text-transform: uppercase;
-      letter-spacing: 0.6px;
-      font-weight: 500;
-      margin-bottom: 12px;
+      font-size: 11px; color: #7d8590; text-transform: uppercase;
+      letter-spacing: 0.6px; font-weight: 500; margin-bottom: 12px;
     }
 
-    .history-table {
-      width: 100%;
-      font-size: 12px;
-      border-collapse: collapse;
-    }
+    /* ── Simple History Table (dashboard) ───────── */
+    .history-table { width: 100%; font-size: 12px; border-collapse: collapse; }
     .history-table th {
-      color: #7d8590;
-      font-weight: 500;
-      padding: 5px 8px;
-      text-align: left;
-      border-bottom: 0.5px solid rgba(255,255,255,0.06);
-      font-size: 11px;
+      color: #7d8590; font-weight: 500; padding: 5px 8px;
+      text-align: left; border-bottom: 0.5px solid rgba(255,255,255,0.06); font-size: 11px;
     }
     .history-table td {
-      padding: 7px 8px;
-      border-bottom: 0.5px solid rgba(255,255,255,0.04);
-      color: #b0bec5;
+      padding: 7px 8px; border-bottom: 0.5px solid rgba(255,255,255,0.04); color: #b0bec5;
     }
     .history-table tr:last-child td { border-bottom: none; }
     .history-table tr:hover td { background: rgba(255,255,255,0.02); }
-
     .tbl-badge {
-      display: inline-block;
-      padding: 2px 8px;
-      border-radius: 10px;
-      font-size: 10px;
-      font-weight: 600;
+      display: inline-block; padding: 2px 8px; border-radius: 10px;
+      font-size: 10px; font-weight: 600;
     }
     .tbl-SAFE     { background: rgba(29,158,117,0.15);  color: #1d9e75; }
     .tbl-MODERATE { background: rgba(239,159,39,0.15);  color: #ef9f27; }
     .tbl-BLOCKAGE { background: rgba(249,115,22,0.15);  color: #f97316; }
     .tbl-DANGER   { background: rgba(226,75,74,0.15);   color: #e24b4a; }
 
-    /* API endpoints */
+    /* ── API Panel ───────────────────────────────── */
     .endpoint {
       display: flex; align-items: flex-start; gap: 8px;
-      padding: 8px 10px;
-      background: rgba(255,255,255,0.03);
-      border-radius: 6px;
-      margin-bottom: 8px;
-      cursor: default;
-      transition: background 0.15s;
+      padding: 8px 10px; background: rgba(255,255,255,0.03);
+      border-radius: 6px; margin-bottom: 8px; cursor: default; transition: background 0.15s;
     }
     .endpoint:hover { background: rgba(255,255,255,0.06); }
     .ep-method {
-      font-size: 10px; font-weight: 600;
-      padding: 2px 7px;
-      border-radius: 4px;
-      white-space: nowrap;
-      margin-top: 1px;
+      font-size: 10px; font-weight: 600; padding: 2px 7px;
+      border-radius: 4px; white-space: nowrap; margin-top: 1px;
     }
     .m-get  { background: rgba(29,158,117,0.2); color: #1d9e75; }
     .m-post { background: rgba(55,138,221,0.2); color: #378add; }
-    .ep-path { font-size: 12px; color: #e6edf3; font-family: 'SFMono-Regular', Consolas, monospace; }
+    .ep-path { font-size: 12px; color: #e6edf3; font-family: monospace; }
     .ep-desc { font-size: 11px; color: #7d8590; margin-top: 2px; }
-
     .sim-btn {
-      width: 100%;
-      margin-top: 12px;
-      padding: 9px;
-      background: rgba(29,158,117,0.1);
-      border: 0.5px solid rgba(29,158,117,0.35);
-      border-radius: 8px;
-      color: #1d9e75;
-      font-size: 13px;
-      font-weight: 500;
-      cursor: pointer;
-      transition: background 0.15s, transform 0.1s;
-      font-family: inherit;
+      width: 100%; margin-top: 12px; padding: 9px;
+      background: rgba(29,158,117,0.1); border: 0.5px solid rgba(29,158,117,0.35);
+      border-radius: 8px; color: #1d9e75; font-size: 13px; font-weight: 500;
+      cursor: pointer; transition: background 0.15s, transform 0.1s; font-family: inherit;
     }
     .sim-btn:hover  { background: rgba(29,158,117,0.2); }
     .sim-btn:active { transform: scale(0.98); }
-
-    /* Offline row */
     .empty-row td { text-align: center; color: #7d8590; padding: 20px !important; font-size: 12px; }
+
+    /* ══════════════════════════════════════════════
+       HISTORY PAGE
+    ══════════════════════════════════════════════ */
+    .history-page-card {
+      background: #161b22; border: 0.5px solid rgba(255,255,255,0.08);
+      border-radius: 10px; padding: 16px 18px;
+    }
+
+    /* Filter bar */
+    .filter-bar {
+      display: flex; gap: 8px; flex-wrap: wrap; align-items: center;
+      margin-bottom: 16px;
+    }
+    .filter-bar h2 {
+      font-size: 14px; font-weight: 600; margin-right: auto;
+    }
+    .filter-btn {
+      padding: 5px 14px; border-radius: 20px; font-size: 11px; font-weight: 600;
+      cursor: pointer; border: 0.5px solid rgba(255,255,255,0.12);
+      background: rgba(255,255,255,0.04); color: #7d8590;
+      transition: all 0.15s; font-family: inherit; letter-spacing: 0.3px;
+    }
+    .filter-btn:hover { border-color: rgba(255,255,255,0.25); color: #b0bec5; }
+    .filter-btn.active { color: #e6edf3; background: #1c2128; border-color: rgba(255,255,255,0.2); }
+    .filter-btn.f-SAFE.active     { border-color: rgba(29,158,117,0.6);  color: #1d9e75; background: rgba(29,158,117,0.08); }
+    .filter-btn.f-MODERATE.active { border-color: rgba(239,159,39,0.6);  color: #ef9f27; background: rgba(239,159,39,0.08); }
+    .filter-btn.f-BLOCKAGE.active { border-color: rgba(249,115,22,0.6);  color: #f97316; background: rgba(249,115,22,0.08); }
+    .filter-btn.f-DANGER.active   { border-color: rgba(226,75,74,0.6);   color: #e24b4a; background: rgba(226,75,74,0.08); }
+
+    /* summary counts */
+    .summary-row {
+      display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px;
+      margin-bottom: 16px;
+    }
+    @media (max-width: 560px) { .summary-row { grid-template-columns: repeat(2,1fr); } }
+    .summary-box {
+      background: rgba(255,255,255,0.03); border: 0.5px solid rgba(255,255,255,0.07);
+      border-radius: 8px; padding: 10px 14px; text-align: center;
+    }
+    .summary-box .sb-count { font-size: 22px; font-weight: 700; line-height: 1; margin-bottom: 4px; }
+    .summary-box .sb-label { font-size: 10px; color: #7d8590; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 500; }
+    .sb-SAFE     .sb-count { color: #1d9e75; }
+    .sb-MODERATE .sb-count { color: #ef9f27; }
+    .sb-BLOCKAGE .sb-count { color: #f97316; }
+    .sb-DANGER   .sb-count { color: #e24b4a; }
+
+    /* Detail table */
+    .detail-table-wrap { overflow-x: auto; }
+    .detail-table {
+      width: 100%; font-size: 12px; border-collapse: collapse; min-width: 720px;
+    }
+    .detail-table th {
+      color: #7d8590; font-weight: 500; padding: 6px 10px;
+      text-align: left; border-bottom: 0.5px solid rgba(255,255,255,0.08);
+      font-size: 11px; white-space: nowrap;
+    }
+    .detail-table td {
+      padding: 8px 10px; border-bottom: 0.5px solid rgba(255,255,255,0.04); color: #b0bec5;
+      vertical-align: top;
+    }
+    .detail-table tr:last-child td { border-bottom: none; }
+    .detail-table tr:hover td { background: rgba(255,255,255,0.025); }
+
+    /* Cause pills */
+    .cause-wrap { display: flex; flex-wrap: wrap; gap: 4px; }
+    .cause-pill {
+      display: inline-block; padding: 1px 7px; border-radius: 8px;
+      font-size: 10px; font-weight: 500;
+    }
+    .cause-air      { background: rgba(226,75,74,0.15);   color: #e24b4a; }
+    .cause-methane  { background: rgba(212,83,126,0.15);  color: #d4537e; }
+    .cause-flow     { background: rgba(127,119,221,0.15); color: #7f77dd; }
+    .cause-distance { background: rgba(29,158,117,0.15);  color: #1d9e75; }
+    .cause-temp     { background: rgba(239,159,39,0.15);  color: #ef9f27; }
+    .cause-humidity { background: rgba(55,138,221,0.15);  color: #378add; }
+    .cause-ok       { background: rgba(255,255,255,0.06); color: #7d8590; }
+
+    /* param value coloring in table */
+    .val-ok  { color: #b0bec5; }
+    .val-warn { color: #ef9f27; }
+    .val-bad  { color: #e24b4a; }
+
+    /* empty state */
+    .hist-empty {
+      text-align: center; padding: 40px; color: #7d8590; font-size: 13px;
+    }
+
+    /* ── Toast ──────────────────────────────────── */
+    #toast-wrap {
+      position: fixed; top: 18px; right: 18px; z-index: 10000;
+      display: flex; flex-direction: column; gap: 10px; pointer-events: none;
+    }
+    .toast {
+      display: flex; align-items: flex-start; gap: 12px;
+      background: #1c2128; border: 0.5px solid rgba(255,255,255,0.12);
+      border-radius: 10px; padding: 13px 16px; min-width: 260px; max-width: 320px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.5); pointer-events: auto;
+      transform: translateX(110%); opacity: 0;
+      transition: transform 0.35s cubic-bezier(0.34,1.56,0.64,1), opacity 0.3s;
+      position: relative; overflow: hidden;
+    }
+    .toast.show { transform: translateX(0); opacity: 1; }
+    .toast.hide { transform: translateX(110%); opacity: 0; }
+    .toast-icon  { font-size: 20px; flex-shrink: 0; margin-top: 1px; }
+    .toast-body  { flex: 1; }
+    .toast-title { font-size: 13px; font-weight: 700; margin-bottom: 3px; }
+    .toast-msg   { font-size: 11px; color: #7d8590; line-height: 1.4; }
+    .toast-bar   { position: absolute; bottom: 0; left: 0; height: 3px; border-radius: 0 0 10px 10px; animation: toastBar 4s linear forwards; }
+    @keyframes toastBar { from { width: 100%; } to { width: 0; } }
+    .toast-SAFE .toast-title    { color: #1d9e75; }
+    .toast-MODERATE .toast-title{ color: #ef9f27; }
+    .toast-BLOCKAGE .toast-title{ color: #f97316; }
+    .toast-DANGER .toast-title  { color: #e24b4a; }
+    .toast-SAFE { border-left: 3px solid #1d9e75; }
+    .toast-MODERATE { border-left: 3px solid #ef9f27; }
+    .toast-BLOCKAGE { border-left: 3px solid #f97316; }
+    .toast-DANGER   { border-left: 3px solid #e24b4a; }
+    .toast-SAFE .toast-bar    { background: #1d9e75; }
+    .toast-MODERATE .toast-bar{ background: #ef9f27; }
+    .toast-BLOCKAGE .toast-bar{ background: #f97316; }
+    .toast-DANGER .toast-bar  { background: #e24b4a; }
+
+    /* ── Screen Flash ───────────────────────────── */
+    #status-flash {
+      position: fixed; inset: 0; pointer-events: none; z-index: 9999;
+      opacity: 0; border: 4px solid transparent;
+    }
+    #status-flash.flash { animation: screenFlash 0.7s ease-out forwards; }
+    @keyframes screenFlash { 0%{opacity:1} 100%{opacity:0} }
   </style>
 </head>
 <body>
+<div class="app">
 <div class="dash">
 
   <!-- Header -->
@@ -378,6 +389,13 @@
         <div class="logo-sub">ESP32 · Firebase · ML Prediction</div>
       </div>
     </div>
+
+    <!-- Page Tabs -->
+    <nav class="nav-tabs" role="tablist">
+      <button class="nav-tab active" id="tab-dashboard" role="tab" aria-selected="true"  onclick="switchPage('dashboard')">📊 Dashboard</button>
+      <button class="nav-tab"        id="tab-history"   role="tab" aria-selected="false" onclick="switchPage('history')">📋 History</button>
+    </nav>
+
     <div class="header-right">
       <div class="live-badge" id="live-badge">
         <div class="ldot" id="ldot"></div>
@@ -387,471 +405,701 @@
     </div>
   </div>
 
-  <!-- Status Banner -->
-  <div class="status-banner OFFLINE" id="status-banner">
-    <span class="status-icon" id="status-icon">🔌</span>
-    <span class="status-badge OFFLINE" id="status-badge">OFFLINE</span>
-    <span class="status-msg" id="status-msg">Connecting to sensor backend…</span>
-  </div>
+  <!-- ══════════════ DASHBOARD PAGE ══════════════ -->
+  <div class="page active" id="page-dashboard">
 
-  <!-- Sensor Cards -->
-  <div class="sensor-grid">
-    <div class="sensor-card">
-      <div class="sensor-label">Temperature</div>
-      <div class="sensor-value val-temp" id="val-temp">--</div>
-      <div class="sensor-unit">°C</div>
-      <div class="sensor-bar"><div class="sensor-bar-fill bar-temp" id="bar-temp" style="width:0%"></div></div>
-    </div>
-    <div class="sensor-card">
-      <div class="sensor-label">Humidity</div>
-      <div class="sensor-value val-humidity" id="val-humidity">--</div>
-      <div class="sensor-unit">% RH</div>
-      <div class="sensor-bar"><div class="sensor-bar-fill bar-humidity" id="bar-humidity" style="width:0%"></div></div>
-    </div>
-    <div class="sensor-card">
-      <div class="sensor-label">Air Quality (MQ-135)</div>
-      <div class="sensor-value val-air" id="val-air">--</div>
-      <div class="sensor-unit">ppm</div>
-      <div class="sensor-bar"><div class="sensor-bar-fill bar-air" id="bar-air" style="width:0%"></div></div>
-    </div>
-    <div class="sensor-card">
-      <div class="sensor-label">Methane (MQ-4)</div>
-      <div class="sensor-value val-methane" id="val-methane">--</div>
-      <div class="sensor-unit">ppm</div>
-      <div class="sensor-bar"><div class="sensor-bar-fill bar-methane" id="bar-methane" style="width:0%"></div></div>
-    </div>
-    <div class="sensor-card">
-      <div class="sensor-label">Water Level</div>
-      <div class="sensor-value val-distance" id="val-distance">--</div>
-      <div class="sensor-unit">cm (ultrasonic)</div>
-      <div class="sensor-bar"><div class="sensor-bar-fill bar-distance" id="bar-distance" style="width:0%"></div></div>
-    </div>
-    <div class="sensor-card">
-      <div class="sensor-label">Flow Rate</div>
-      <div class="sensor-value val-flow" id="val-flow">--</div>
-      <div class="sensor-unit">L/min</div>
-      <div class="sensor-bar"><div class="sensor-bar-fill bar-flow" id="bar-flow" style="width:0%"></div></div>
-    </div>
-  </div>
-
-  <!-- Charts -->
-  <div class="charts-row">
-    <div class="chart-card">
-      <div class="chart-title">
-        Gas Levels (ppm)
-        <div class="chart-legend">
-          <div class="cl-item"><div class="cl-dot" style="background:#e24b4a"></div>Air Quality</div>
-          <div class="cl-item"><div class="cl-dot" style="background:#d4537e"></div>Methane</div>
-        </div>
-      </div>
-      <div style="position:relative;height:160px;">
-        <canvas id="gasChart" role="img" aria-label="Gas sensor readings over time"></canvas>
-      </div>
-    </div>
-    <div class="chart-card">
-      <div class="chart-title">
-        Temperature &amp; Humidity
-        <div class="chart-legend">
-          <div class="cl-item"><div class="cl-dot" style="background:#ef9f27"></div>Temp</div>
-          <div class="cl-item"><div class="cl-dot" style="background:#378add;"></div>Humidity</div>
-        </div>
-      </div>
-      <div style="position:relative;height:160px;">
-        <canvas id="envChart" role="img" aria-label="Temperature and humidity trends"></canvas>
-      </div>
-    </div>
-  </div>
-
-  <!-- Bottom Row: History Table + API Panel -->
-  <div class="bottom-row">
-    <div class="history-card">
-      <div class="section-title">Recent Readings</div>
-      <table class="history-table">
-        <thead>
-          <tr>
-            <th>Time</th>
-            <th>Temp</th>
-            <th>Air</th>
-            <th>CH₄</th>
-            <th>Flow</th>
-            <th>Status</th>
-          </tr>
-        </thead>
-        <tbody id="history-body">
-          <tr class="empty-row"><td colspan="6">Waiting for data…</td></tr>
-        </tbody>
-      </table>
+    <!-- Status Banner -->
+    <div class="status-banner OFFLINE" id="status-banner">
+      <span class="status-icon" id="status-icon">🔌</span>
+      <span class="status-badge OFFLINE" id="status-badge">OFFLINE</span>
+      <span class="status-msg" id="status-msg">Connecting to sensor backend…</span>
     </div>
 
-    <div class="api-card">
-      <div class="section-title">API Endpoints</div>
-      <div class="endpoint">
-        <div>
-          <div style="display:flex;align-items:center;gap:8px;">
-            <span class="ep-method m-get">GET</span>
-            <span class="ep-path">/</span>
+    <!-- Sensor Cards with Safe Ranges -->
+    <div class="sensor-grid">
+
+      <!-- Temperature -->
+      <div class="sensor-card">
+        <div class="sensor-label">Temperature</div>
+        <div class="sensor-value val-temp" id="val-temp">--</div>
+        <div class="sensor-unit">°C</div>
+        <div class="range-bar-wrap">
+          <div class="range-bar" id="rbar-temp">
+            <!-- SAFE: 0–30  MODERATE: 30–38  DANGER: 38–60 -->
+            <div class="range-seg" style="left:0%;   width:50%;  background:rgba(29,158,117,0.5)"></div>
+            <div class="range-seg" style="left:50%;  width:13%;  background:rgba(239,159,39,0.55)"></div>
+            <div class="range-seg" style="left:63%;  width:37%;  background:rgba(226,75,74,0.5)"></div>
+            <div class="range-needle" id="ndl-temp"></div>
           </div>
-          <div class="ep-desc">Web dashboard</div>
+          <div class="range-labels"><span>0°C</span><span>30</span><span>38</span><span>60°C</span></div>
+          <div class="range-status" id="rst-temp"><div class="range-dot" style="background:#7d8590"></div><span>—</span></div>
         </div>
       </div>
-      <div class="endpoint">
-        <div>
-          <div style="display:flex;align-items:center;gap:8px;">
-            <span class="ep-method m-post">POST</span>
-            <span class="ep-path">/data</span>
+
+      <!-- Humidity -->
+      <div class="sensor-card">
+        <div class="sensor-label">Humidity</div>
+        <div class="sensor-value val-humidity" id="val-humidity">--</div>
+        <div class="sensor-unit">% RH</div>
+        <div class="range-bar-wrap">
+          <div class="range-bar" id="rbar-humidity">
+            <!-- SAFE: 0–65  MODERATE: 65–80  DANGER: 80–100 -->
+            <div class="range-seg" style="left:0%;  width:65%;  background:rgba(29,158,117,0.5)"></div>
+            <div class="range-seg" style="left:65%; width:15%;  background:rgba(239,159,39,0.55)"></div>
+            <div class="range-seg" style="left:80%; width:20%;  background:rgba(226,75,74,0.5)"></div>
+            <div class="range-needle" id="ndl-humidity"></div>
           </div>
-          <div class="ep-desc">ESP32 pushes sensor data</div>
+          <div class="range-labels"><span>0%</span><span>65</span><span>80</span><span>100%</span></div>
+          <div class="range-status" id="rst-humidity"><div class="range-dot" style="background:#7d8590"></div><span>—</span></div>
         </div>
       </div>
-      <div class="endpoint">
-        <div>
-          <div style="display:flex;align-items:center;gap:8px;">
-            <span class="ep-method m-get">GET</span>
-            <span class="ep-path">/get-data</span>
+
+      <!-- Air Quality -->
+      <div class="sensor-card">
+        <div class="sensor-label">Air Quality (MQ-135)</div>
+        <div class="sensor-value val-air" id="val-air">--</div>
+        <div class="sensor-unit">ppm</div>
+        <div class="range-bar-wrap">
+          <div class="range-bar" id="rbar-air">
+            <!-- SAFE: 0–200  MODERATE: 200–350  BLOCKAGE: 350–600  DANGER: 600–1500 -->
+            <div class="range-seg" style="left:0%;    width:13.3%; background:rgba(29,158,117,0.5)"></div>
+            <div class="range-seg" style="left:13.3%; width:10%;   background:rgba(239,159,39,0.55)"></div>
+            <div class="range-seg" style="left:23.3%; width:16.7%; background:rgba(249,115,22,0.55)"></div>
+            <div class="range-seg" style="left:40%;   width:60%;   background:rgba(226,75,74,0.5)"></div>
+            <div class="range-needle" id="ndl-air"></div>
           </div>
-          <div class="ep-desc">Dashboard polls latest</div>
+          <div class="range-labels"><span>0</span><span>200</span><span>350</span><span>600</span><span>1500</span></div>
+          <div class="range-status" id="rst-air"><div class="range-dot" style="background:#7d8590"></div><span>—</span></div>
         </div>
       </div>
-      <button class="sim-btn" id="sim-btn" onclick="simulateReading()">↻ Simulate ESP32 Reading</button>
+
+      <!-- Methane -->
+      <div class="sensor-card">
+        <div class="sensor-label">Methane (MQ-4)</div>
+        <div class="sensor-value val-methane" id="val-methane">--</div>
+        <div class="sensor-unit">ppm</div>
+        <div class="range-bar-wrap">
+          <div class="range-bar" id="rbar-methane">
+            <!-- SAFE: 0–250  MODERATE: 250–450  BLOCKAGE: 450–700  DANGER: 700–1500 -->
+            <div class="range-seg" style="left:0%;    width:16.7%; background:rgba(29,158,117,0.5)"></div>
+            <div class="range-seg" style="left:16.7%; width:13.3%; background:rgba(239,159,39,0.55)"></div>
+            <div class="range-seg" style="left:30%;   width:16.7%; background:rgba(249,115,22,0.55)"></div>
+            <div class="range-seg" style="left:46.7%; width:53.3%; background:rgba(226,75,74,0.5)"></div>
+            <div class="range-needle" id="ndl-methane"></div>
+          </div>
+          <div class="range-labels"><span>0</span><span>250</span><span>450</span><span>700</span><span>1500</span></div>
+          <div class="range-status" id="rst-methane"><div class="range-dot" style="background:#7d8590"></div><span>—</span></div>
+        </div>
+      </div>
+
+      <!-- Water Level -->
+      <div class="sensor-card">
+        <div class="sensor-label">Water Level (Distance)</div>
+        <div class="sensor-value val-distance" id="val-distance">--</div>
+        <div class="sensor-unit">cm (ultrasonic)</div>
+        <div class="range-bar-wrap">
+          <div class="range-bar" id="rbar-distance">
+            <!-- Lower distance = higher water = worse. SAFE: >80  MODERATE: 50–80  BLOCKAGE: 20–50  DANGER: <20 -->
+            <!-- Bar shows 0–200 cm: danger zone first visually (distance inverted) -->
+            <div class="range-seg" style="left:0%;  width:10%;  background:rgba(226,75,74,0.5)"></div>
+            <div class="range-seg" style="left:10%; width:15%;  background:rgba(249,115,22,0.55)"></div>
+            <div class="range-seg" style="left:25%; width:27.5%;background:rgba(239,159,39,0.55)"></div>
+            <div class="range-seg" style="left:52.5%;width:47.5%;background:rgba(29,158,117,0.5)"></div>
+            <div class="range-needle" id="ndl-distance"></div>
+          </div>
+          <div class="range-labels"><span>0cm</span><span>20</span><span>50</span><span>80</span><span>200cm</span></div>
+          <div class="range-status" id="rst-distance"><div class="range-dot" style="background:#7d8590"></div><span>—</span></div>
+        </div>
+      </div>
+
+      <!-- Flow Rate -->
+      <div class="sensor-card">
+        <div class="sensor-label">Flow Rate</div>
+        <div class="sensor-value val-flow" id="val-flow">--</div>
+        <div class="sensor-unit">L/min</div>
+        <div class="range-bar-wrap">
+          <div class="range-bar" id="rbar-flow">
+            <!-- DANGER: 0–1  BLOCKAGE: 1–3  MODERATE: 3–6  SAFE: 6–20 -->
+            <div class="range-seg" style="left:0%;  width:5%;   background:rgba(226,75,74,0.5)"></div>
+            <div class="range-seg" style="left:5%;  width:10%;  background:rgba(249,115,22,0.55)"></div>
+            <div class="range-seg" style="left:15%; width:15%;  background:rgba(239,159,39,0.55)"></div>
+            <div class="range-seg" style="left:30%; width:70%;  background:rgba(29,158,117,0.5)"></div>
+            <div class="range-needle" id="ndl-flow"></div>
+          </div>
+          <div class="range-labels"><span>0</span><span>1</span><span>3</span><span>6</span><span>20 L/min</span></div>
+          <div class="range-status" id="rst-flow"><div class="range-dot" style="background:#7d8590"></div><span>—</span></div>
+        </div>
+      </div>
+
+    </div><!-- /sensor-grid -->
+
+    <!-- Charts -->
+    <div class="charts-row">
+      <div class="chart-card">
+        <div class="chart-title">
+          Gas Levels (ppm)
+          <div class="chart-legend">
+            <div class="cl-item"><div class="cl-dot" style="background:#e24b4a"></div>Air</div>
+            <div class="cl-item"><div class="cl-dot" style="background:#d4537e"></div>CH₄</div>
+          </div>
+        </div>
+        <div style="position:relative;height:160px;">
+          <canvas id="gasChart" role="img" aria-label="Gas sensor readings over time"></canvas>
+        </div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">
+          Temperature &amp; Humidity
+          <div class="chart-legend">
+            <div class="cl-item"><div class="cl-dot" style="background:#ef9f27"></div>Temp</div>
+            <div class="cl-item"><div class="cl-dot" style="background:#378add;"></div>Humidity</div>
+          </div>
+        </div>
+        <div style="position:relative;height:160px;">
+          <canvas id="envChart" role="img" aria-label="Temperature and humidity trends"></canvas>
+        </div>
+      </div>
     </div>
-  </div>
+
+    <!-- Bottom Row -->
+    <div class="bottom-row">
+      <div class="history-card">
+        <div class="section-title">Recent Readings</div>
+        <table class="history-table">
+          <thead>
+            <tr>
+              <th>Time</th><th>Temp</th><th>Air</th><th>CH₄</th><th>Flow</th><th>Status</th>
+            </tr>
+          </thead>
+          <tbody id="history-body">
+            <tr class="empty-row"><td colspan="6">Waiting for data…</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="api-card">
+        <div class="section-title">API Endpoints</div>
+        <div class="endpoint">
+          <div>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span class="ep-method m-get">GET</span>
+              <span class="ep-path">/</span>
+            </div>
+            <div class="ep-desc">Web dashboard</div>
+          </div>
+        </div>
+        <div class="endpoint">
+          <div>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span class="ep-method m-post">POST</span>
+              <span class="ep-path">/data</span>
+            </div>
+            <div class="ep-desc">ESP32 pushes sensor data</div>
+          </div>
+        </div>
+        <div class="endpoint">
+          <div>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span class="ep-method m-get">GET</span>
+              <span class="ep-path">/get-data</span>
+            </div>
+            <div class="ep-desc">Dashboard polls latest</div>
+          </div>
+        </div>
+        <div class="endpoint">
+          <div>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span class="ep-method m-get">GET</span>
+              <span class="ep-path">/health</span>
+            </div>
+            <div class="ep-desc">Server + model status</div>
+          </div>
+        </div>
+        <button class="sim-btn" id="sim-btn" onclick="simulateReading()">↻ Simulate ESP32 Reading</button>
+      </div>
+    </div>
+
+  </div><!-- /page-dashboard -->
+
+  <!-- ══════════════ HISTORY PAGE ══════════════ -->
+  <div class="page" id="page-history">
+    <div class="history-page-card">
+
+      <!-- Filter bar -->
+      <div class="filter-bar">
+        <h2>📋 Full Reading History</h2>
+        <button class="filter-btn active" id="f-ALL"      onclick="setFilter('ALL')">All</button>
+        <button class="filter-btn f-SAFE"     id="f-SAFE"     onclick="setFilter('SAFE')">✅ Safe</button>
+        <button class="filter-btn f-MODERATE" id="f-MODERATE" onclick="setFilter('MODERATE')">⚠️ Moderate</button>
+        <button class="filter-btn f-BLOCKAGE" id="f-BLOCKAGE" onclick="setFilter('BLOCKAGE')">🚧 Blockage</button>
+        <button class="filter-btn f-DANGER"   id="f-DANGER"   onclick="setFilter('DANGER')">🚨 Danger</button>
+      </div>
+
+      <!-- Summary boxes -->
+      <div class="summary-row">
+        <div class="summary-box sb-SAFE">
+          <div class="sb-count" id="cnt-SAFE">0</div>
+          <div class="sb-label">Safe</div>
+        </div>
+        <div class="summary-box sb-MODERATE">
+          <div class="sb-count" id="cnt-MODERATE">0</div>
+          <div class="sb-label">Moderate</div>
+        </div>
+        <div class="summary-box sb-BLOCKAGE">
+          <div class="sb-count" id="cnt-BLOCKAGE">0</div>
+          <div class="sb-label">Blockage</div>
+        </div>
+        <div class="summary-box sb-DANGER">
+          <div class="sb-count" id="cnt-DANGER">0</div>
+          <div class="sb-label">Danger</div>
+        </div>
+      </div>
+
+      <!-- Detail table -->
+      <div class="detail-table-wrap">
+        <table class="detail-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Time</th>
+              <th>Status</th>
+              <th>Temp °C</th>
+              <th>Humidity %</th>
+              <th>Air ppm</th>
+              <th>CH₄ ppm</th>
+              <th>Distance cm</th>
+              <th>Flow L/min</th>
+              <th>Cause (threshold violations)</th>
+            </tr>
+          </thead>
+          <tbody id="detail-body">
+            <tr><td colspan="10" style="text-align:center;padding:30px;color:#7d8590">No history yet — simulate or wait for ESP32 data.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+    </div>
+  </div><!-- /page-history -->
 
 </div><!-- /dash -->
+</div><!-- /app -->
+
+<!-- Screen Flash -->
+<div id="status-flash"></div>
+<!-- Toasts -->
+<div id="toast-wrap" role="status" aria-live="polite"></div>
 
 <script>
-/* ════════════════════════════════════════════
+/* ════════════════════════════════════════════════════════════════
    CONFIG
-════════════════════════════════════════════ */
+════════════════════════════════════════════════════════════════ */
 const API_URL    = '/get-data?limit=50';
 const REFRESH_MS = 4000;
 const MAX_POINTS = 20;
 
-/* ════════════════════════════════════════════
-   SHARED CHART DATA ARRAYS
-   (shared between both charts so x-axis labels stay in sync)
-════════════════════════════════════════════ */
-const labels      = [];
-const airData     = [];
-const methaneData = [];
-const tempData    = [];
-const humData     = [];
+/* ════════════════════════════════════════════════════════════════
+   THRESHOLD DEFINITIONS  (must match train_model.py)
+════════════════════════════════════════════════════════════════ */
+const THRESHOLDS = {
+  air:      { moderate: 200, blockage: 350, danger: 600,  max: 1500 },
+  methane:  { moderate: 250, blockage: 450, danger: 700,  max: 1500 },
+  temp:     { moderate: 30,  danger: 38,    max: 60 },
+  humidity: { moderate: 65,  danger: 80,    max: 100 },
+  distance: { danger: 20, blockage: 50, moderate: 80, max: 200 },  // lower = worse
+  flow:     { danger: 1,  blockage: 3,  moderate: 6,  max: 20 },   // lower = worse
+};
 
-/* ════════════════════════════════════════════
+/* ════════════════════════════════════════════════════════════════
+   RANGE BAR CONFIG  (each sensor: max value, and zone thresholds)
+════════════════════════════════════════════════════════════════ */
+function getRangeZone(sensor, val) {
+  if (val == null || isNaN(val)) return { zone: 'unknown', label: '—', color: '#7d8590' };
+  const z = {
+    air:      val > 600 ? 'danger'   : val > 350 ? 'blockage' : val > 200 ? 'moderate' : 'safe',
+    methane:  val > 700 ? 'danger'   : val > 450 ? 'blockage' : val > 250 ? 'moderate' : 'safe',
+    temp:     val > 38  ? 'danger'   : val > 30  ? 'moderate' : 'safe',
+    humidity: val > 80  ? 'danger'   : val > 65  ? 'moderate' : 'safe',
+    distance: val < 20  ? 'danger'   : val < 50  ? 'blockage' : val < 80 ? 'moderate' : 'safe',
+    flow:     val < 1   ? 'danger'   : val < 3   ? 'blockage' : val < 6  ? 'moderate' : 'safe',
+  }[sensor] || 'safe';
+
+  const MAP = {
+    safe:     { label: 'Safe range ✓',    color: '#1d9e75' },
+    moderate: { label: 'Moderate ⚠️',      color: '#ef9f27' },
+    blockage: { label: 'Blockage risk 🚧', color: '#f97316' },
+    danger:   { label: 'Danger ⛔',        color: '#e24b4a' },
+  };
+  return { zone: z, ...MAP[z] };
+}
+
+function getNeedlePct(sensor, val) {
+  if (val == null || isNaN(val)) return 0;
+  const max = THRESHOLDS[sensor].max || 100;
+  return Math.min(100, Math.max(0, (val / max) * 100));
+}
+
+function updateRangeBar(sensor, val) {
+  const ndl = document.getElementById('ndl-' + sensor);
+  const rst = document.getElementById('rst-' + sensor);
+  if (!ndl || !rst) return;
+
+  const pct  = getNeedlePct(sensor, val);
+  const info = getRangeZone(sensor, val);
+
+  ndl.style.left = pct + '%';
+  rst.className  = 'range-status ' + info.zone;
+  rst.innerHTML  = `<div class="range-dot" style="background:${info.color}"></div><span>${info.label}</span>`;
+}
+
+/* ════════════════════════════════════════════════════════════════
+   PAGE NAV
+════════════════════════════════════════════════════════════════ */
+let currentPage = 'dashboard';
+
+function switchPage(name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('page-' + name).classList.add('active');
+  document.getElementById('tab-' + name).classList.add('active');
+  currentPage = name;
+  if (name === 'history') renderDetailTable();
+}
+
+/* ════════════════════════════════════════════════════════════════
    STATUS CONFIG
-════════════════════════════════════════════ */
+════════════════════════════════════════════════════════════════ */
 const STATUS_CFG = {
-  SAFE:     { icon:'✅', msg:'All parameters within normal range. System operating normally.' },
-  MODERATE: { icon:'⚠️', msg:'Elevated readings detected. Monitor the system closely.' },
+  SAFE:     { icon:'✅', msg:'All parameters within normal range.' },
+  MODERATE: { icon:'⚠️', msg:'Elevated readings detected. Monitor closely.' },
   BLOCKAGE: { icon:'🚧', msg:'Flow blocked — inspect sewer line immediately.' },
-  DANGER:   { icon:'🚨', msg:'Critical gas or overflow detected. Take immediate action!' },
+  DANGER:   { icon:'🚨', msg:'Critical gas or overflow detected. Act NOW!' },
   OFFLINE:  { icon:'🔌', msg:'Connecting to sensor backend…' },
 };
 
-/* ════════════════════════════════════════════
-   CHART OPTIONS (shared)
-════════════════════════════════════════════ */
+/* ════════════════════════════════════════════════════════════════
+   CHARTS
+════════════════════════════════════════════════════════════════ */
+const labels = [], airData = [], methaneData = [], tempData = [], humData = [];
+
 const chartOpts = {
-  responsive: true,
-  maintainAspectRatio: false,
+  responsive: true, maintainAspectRatio: false,
   animation: { duration: 400 },
   plugins: { legend: { display: false }, tooltip: {
-    backgroundColor: '#1c2128',
-    titleColor: '#7d8590',
-    bodyColor: '#e6edf3',
-    borderColor: 'rgba(255,255,255,0.08)',
-    borderWidth: 1,
-    padding: 10,
-    cornerRadius: 8,
-    mode: 'index',
-    intersect: false,
+    backgroundColor:'#1c2128', titleColor:'#7d8590', bodyColor:'#e6edf3',
+    borderColor:'rgba(255,255,255,0.08)', borderWidth:1, padding:10,
+    cornerRadius:8, mode:'index', intersect:false,
   }},
   scales: {
-    x: {
-      ticks: { color: '#7d8590', font: { size: 10 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 6 },
-      grid: { color: 'rgba(255,255,255,0.04)', border: { display: false } },
-    },
-    y: {
-      ticks: { color: '#7d8590', font: { size: 10 } },
-      grid: { color: 'rgba(255,255,255,0.04)', border: { display: false } },
-    }
+    x: { ticks:{color:'#7d8590',font:{size:10},maxRotation:0,autoSkip:true,maxTicksLimit:6}, grid:{color:'rgba(255,255,255,0.04)',border:{display:false}} },
+    y: { ticks:{color:'#7d8590',font:{size:10}}, grid:{color:'rgba(255,255,255,0.04)',border:{display:false}} }
   }
 };
 
-/* ════════════════════════════════════════════
-   CHARTS
-════════════════════════════════════════════ */
 const gasChart = new Chart(document.getElementById('gasChart'), {
   type: 'line',
-  data: {
-    labels,
-    datasets: [
-      { label: 'Air Quality (ppm)', data: airData,     borderColor: '#e24b4a', borderWidth: 1.5, pointRadius: 0, pointHoverRadius: 4, tension: 0.4, fill: false },
-      { label: 'Methane (ppm)',     data: methaneData, borderColor: '#d4537e', borderWidth: 1.5, pointRadius: 0, pointHoverRadius: 4, tension: 0.4, borderDash: [4,3], fill: false },
-    ]
-  },
+  data: { labels, datasets: [
+    { label:'Air Quality (ppm)', data:airData,     borderColor:'#e24b4a', borderWidth:1.5, pointRadius:0, pointHoverRadius:4, tension:0.4, fill:false },
+    { label:'Methane (ppm)',     data:methaneData, borderColor:'#d4537e', borderWidth:1.5, pointRadius:0, pointHoverRadius:4, tension:0.4, borderDash:[4,3], fill:false },
+  ]},
   options: chartOpts,
 });
-
 const envChart = new Chart(document.getElementById('envChart'), {
   type: 'line',
-  data: {
-    labels,
-    datasets: [
-      { label: 'Temperature (°C)', data: tempData, borderColor: '#ef9f27', borderWidth: 1.5, pointRadius: 0, pointHoverRadius: 4, tension: 0.4, fill: false },
-      { label: 'Humidity (%)',     data: humData,  borderColor: '#378add', borderWidth: 1.5, pointRadius: 0, pointHoverRadius: 4, tension: 0.4, borderDash: [4,3], fill: false },
-    ]
-  },
+  data: { labels, datasets: [
+    { label:'Temperature (°C)', data:tempData, borderColor:'#ef9f27', borderWidth:1.5, pointRadius:0, pointHoverRadius:4, tension:0.4, fill:false },
+    { label:'Humidity (%)',     data:humData,  borderColor:'#378add', borderWidth:1.5, pointRadius:0, pointHoverRadius:4, tension:0.4, borderDash:[4,3], fill:false },
+  ]},
   options: chartOpts,
 });
 
-/* ════════════════════════════════════════════
-   HISTORY TABLE
-════════════════════════════════════════════ */
-let historyRows = [];
+/* ════════════════════════════════════════════════════════════════
+   CAUSE ANALYSIS  — explain WHY a status was triggered
+════════════════════════════════════════════════════════════════ */
+function analyzeCauses(d) {
+  const causes = [];
+  const status = (d.status || 'SAFE').toUpperCase();
 
-function statusBadge(s) {
-  return `<span class="tbl-badge tbl-${s}">${s}</span>`;
+  if (d.air     > 600) causes.push({ cls: 'cause-air',      text: `Air ${Math.round(d.air)} ppm >600 ⛔` });
+  else if (d.air > 350) causes.push({ cls: 'cause-air',      text: `Air ${Math.round(d.air)} ppm >350 🚧` });
+  else if (d.air > 200) causes.push({ cls: 'cause-air',      text: `Air ${Math.round(d.air)} ppm >200 ⚠️` });
+
+  if (d.methane  > 700) causes.push({ cls: 'cause-methane',  text: `CH₄ ${Math.round(d.methane)} ppm >700 ⛔` });
+  else if (d.methane > 450) causes.push({ cls: 'cause-methane', text: `CH₄ ${Math.round(d.methane)} ppm >450 🚧` });
+  else if (d.methane > 250) causes.push({ cls: 'cause-methane', text: `CH₄ ${Math.round(d.methane)} ppm >250 ⚠️` });
+
+  if (d.flow != null) {
+    if (d.flow < 1)  causes.push({ cls: 'cause-flow', text: `Flow ${d.flow.toFixed(2)} L/min <1 ⛔` });
+    else if (d.flow < 3) causes.push({ cls: 'cause-flow', text: `Flow ${d.flow.toFixed(2)} L/min <3 🚧` });
+    else if (d.flow < 6) causes.push({ cls: 'cause-flow', text: `Flow ${d.flow.toFixed(2)} L/min <6 ⚠️` });
+  }
+
+  if (d.distance != null && d.distance > 0) {
+    if (d.distance < 20) causes.push({ cls: 'cause-distance', text: `Level ${d.distance.toFixed(1)} cm <20 ⛔` });
+    else if (d.distance < 50) causes.push({ cls: 'cause-distance', text: `Level ${d.distance.toFixed(1)} cm <50 🚧` });
+    else if (d.distance < 80) causes.push({ cls: 'cause-distance', text: `Level ${d.distance.toFixed(1)} cm <80 ⚠️` });
+  }
+
+  if (d.temp > 38) causes.push({ cls: 'cause-temp', text: `Temp ${d.temp.toFixed(1)}°C >38 ⛔` });
+  else if (d.temp > 30) causes.push({ cls: 'cause-temp', text: `Temp ${d.temp.toFixed(1)}°C >30 ⚠️` });
+
+  if (d.humidity > 80) causes.push({ cls: 'cause-humidity', text: `Humidity ${d.humidity.toFixed(1)}% >80 ⛔` });
+  else if (d.humidity > 65) causes.push({ cls: 'cause-humidity', text: `Humidity ${d.humidity.toFixed(1)}% >65 ⚠️` });
+
+  if (causes.length === 0) causes.push({ cls: 'cause-ok', text: 'All parameters within safe range' });
+
+  return causes;
 }
 
-function pushHistory(d, ts) {
-  historyRows.unshift({
-    t: ts,
-    temp:    d.temp    != null ? d.temp.toFixed(1)    : '--',
-    air:     d.air     != null ? Math.round(d.air)    : '--',
-    methane: d.methane != null ? Math.round(d.methane): '--',
-    flow:    d.flow    != null ? d.flow.toFixed(2)    : '--',
-    status:  (d.status || 'SAFE').toUpperCase(),
-  });
-  if (historyRows.length > 8) historyRows.pop();
+function valClass(sensor, val) {
+  if (val == null || isNaN(val)) return 'val-ok';
+  const z = getRangeZone(sensor, val).zone;
+  if (z === 'danger' || z === 'blockage') return 'val-bad';
+  if (z === 'moderate') return 'val-warn';
+  return 'val-ok';
+}
 
-  document.getElementById('history-body').innerHTML = historyRows.map(r => `
+/* ════════════════════════════════════════════════════════════════
+   FULL HISTORY STORE  (all readings since page load)
+════════════════════════════════════════════════════════════════ */
+const allReadings = [];
+let histFilter    = 'ALL';
+const counts      = { SAFE: 0, MODERATE: 0, BLOCKAGE: 0, DANGER: 0 };
+
+function setFilter(f) {
+  histFilter = f;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('f-' + f).classList.add('active');
+  renderDetailTable();
+}
+
+function renderDetailTable() {
+  const filtered = histFilter === 'ALL'
+    ? allReadings
+    : allReadings.filter(r => r.status === histFilter);
+
+  const body = document.getElementById('detail-body');
+
+  if (filtered.length === 0) {
+    body.innerHTML = `<tr><td colspan="10" style="text-align:center;padding:30px;color:#7d8590">
+      ${histFilter === 'ALL' ? 'No history yet — simulate or wait for ESP32 data.' : 'No ' + histFilter + ' events recorded yet.'}
+    </td></tr>`;
+    return;
+  }
+
+  body.innerHTML = filtered.map((r, i) => {
+    const causes = analyzeCauses(r);
+    const pillsHtml = causes.map(c => `<span class="cause-pill ${c.cls}">${c.text}</span>`).join('');
+    const dist = r.distance > 0 ? r.distance.toFixed(1) : '—';
+
+    return `<tr>
+      <td style="color:#556070">${filtered.length - i}</td>
+      <td style="white-space:nowrap">${r.ts}</td>
+      <td><span class="tbl-badge tbl-${r.status}">${r.status}</span></td>
+      <td class="${valClass('temp',     r.temp)}">${r.temp != null ? r.temp.toFixed(1) + '°C' : '—'}</td>
+      <td class="${valClass('humidity', r.humidity)}">${r.humidity != null ? r.humidity.toFixed(1) + '%' : '—'}</td>
+      <td class="${valClass('air',      r.air)}">${r.air != null ? Math.round(r.air) : '—'}</td>
+      <td class="${valClass('methane',  r.methane)}">${r.methane != null ? Math.round(r.methane) : '—'}</td>
+      <td class="${valClass('distance', r.distance)}">${dist}</td>
+      <td class="${valClass('flow',     r.flow)}">${r.flow != null ? r.flow.toFixed(2) : '—'}</td>
+      <td><div class="cause-wrap">${pillsHtml}</div></td>
+    </tr>`;
+  }).join('');
+}
+
+function pushToHistory(d, ts) {
+  const status = (d.status || 'SAFE').toUpperCase();
+  const entry  = { ...d, status, ts };
+  allReadings.unshift(entry);
+  if (allReadings.length > 500) allReadings.pop();
+
+  // Update counts
+  if (counts[status] !== undefined) {
+    counts[status]++;
+    document.getElementById('cnt-' + status).textContent = counts[status];
+  }
+
+  if (currentPage === 'history') renderDetailTable();
+}
+
+/* ════════════════════════════════════════════════════════════════
+   DASHBOARD HISTORY TABLE (recent 8)
+════════════════════════════════════════════════════════════════ */
+let dashHistory = [];
+
+function pushDashHistory(d, ts) {
+  const status = (d.status || 'SAFE').toUpperCase();
+  dashHistory.unshift({ t: ts, temp: d.temp, air: d.air, methane: d.methane, flow: d.flow, status });
+  if (dashHistory.length > 8) dashHistory.pop();
+
+  document.getElementById('history-body').innerHTML = dashHistory.map(r => `
     <tr>
       <td>${r.t}</td>
-      <td>${r.temp}°C</td>
-      <td>${r.air}</td>
-      <td>${r.methane}</td>
-      <td>${r.flow}</td>
-      <td>${statusBadge(r.status)}</td>
+      <td>${r.temp != null ? r.temp.toFixed(1) + '°C' : '--'}</td>
+      <td>${r.air  != null ? Math.round(r.air)        : '--'}</td>
+      <td>${r.methane != null ? Math.round(r.methane)  : '--'}</td>
+      <td>${r.flow != null ? r.flow.toFixed(2)         : '--'}</td>
+      <td><span class="tbl-badge tbl-${r.status}">${r.status}</span></td>
     </tr>
   `).join('');
 }
 
-/* ════════════════════════════════════════════
-   SENSORS UPDATE
-════════════════════════════════════════════ */
+/* ════════════════════════════════════════════════════════════════
+   SENSOR CARD VALUES
+════════════════════════════════════════════════════════════════ */
 function updateSensors(d) {
-  const set = (id, val, decimals = 1) => {
+  const set = (id, val, dec) => {
     const el = document.getElementById(id);
-    if (el) el.textContent = val != null ? Number(val).toFixed(decimals) : '--';
+    if (el) el.textContent = val != null ? Number(val).toFixed(dec) : '--';
   };
-  const bar = (id, val, max) => {
-    const el = document.getElementById(id);
-    if (el && val != null) el.style.width = Math.min(100, (val / max) * 100) + '%';
-  };
+  set('val-temp',     d.temp,     1);
+  set('val-humidity', d.humidity, 1);
+  set('val-air',      d.air,      0);
+  set('val-methane',  d.methane,  0);
+  set('val-distance', d.distance > 0 ? d.distance : null, 1);
+  set('val-flow',     d.flow,     2);
 
-  set('val-temp',     d.temp,      1);
-  set('val-humidity', d.humidity,  1);
-  set('val-air',      d.air,       0);
-  set('val-methane',  d.methane,   0);
-  set('val-distance', d.distance,  1);
-  set('val-flow',     d.flow,      2);
-
-  bar('bar-temp',     d.temp,     60);
-  bar('bar-humidity', d.humidity, 100);
-  bar('bar-air',      d.air,      500);
-  bar('bar-methane',  d.methane,  1000);
-  bar('bar-distance', d.distance, 200);
-  bar('bar-flow',     d.flow,     20);
+  updateRangeBar('temp',     d.temp);
+  updateRangeBar('humidity', d.humidity);
+  updateRangeBar('air',      d.air);
+  updateRangeBar('methane',  d.methane);
+  updateRangeBar('distance', d.distance);
+  updateRangeBar('flow',     d.flow);
 }
 
-/* ════════════════════════════════════════════
-   TOAST NOTIFICATIONS
-════════════════════════════════════════════ */
-function showToast(status) {
-  const cfg = STATUS_CFG[status] || STATUS_CFG.SAFE;
-  const wrap = document.getElementById('toast-wrap');
-
-  const toast = document.createElement('div');
-  toast.className = `toast toast-${status}`;
-  toast.innerHTML = `
-    <div class="toast-icon">${cfg.icon}</div>
-    <div class="toast-body">
-      <div class="toast-title">Status: ${status}</div>
-      <div class="toast-msg">${cfg.msg}</div>
-    </div>
-    <div class="toast-bar"></div>
-  `;
-  wrap.appendChild(toast);
-
-  requestAnimationFrame(() => requestAnimationFrame(() => toast.classList.add('show')));
-
-  setTimeout(() => {
-    toast.classList.add('hide');
-    setTimeout(() => toast.remove(), 400);
-  }, 4000);
-}
-
-/* ════════════════════════════════════════════
-   SCREEN FLASH
-════════════════════════════════════════════ */
-const FLASH_COLORS = {
-  SAFE:     'rgba(29,158,117,0.18)',
-  MODERATE: 'rgba(239,159,39,0.22)',
-  BLOCKAGE: 'rgba(249,115,22,0.25)',
-  DANGER:   'rgba(226,75,74,0.30)',
-};
-
-function triggerFlash(status) {
-  const el = document.getElementById('status-flash');
-  el.style.background = FLASH_COLORS[status] || 'transparent';
-  el.style.borderColor = FLASH_COLORS[status] || 'transparent';
-  el.classList.remove('flash');
-  void el.offsetWidth;   // force reflow to restart animation
-  el.classList.add('flash');
-}
-
-/* ════════════════════════════════════════════
-   AUDIO ALERT (Web Audio API — no files needed)
-════════════════════════════════════════════ */
-let audioCtx = null;
-
-function getAudioCtx() {
-  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-  return audioCtx;
-}
-
-function playTone(freq, duration, type = 'sine', gain = 0.3) {
-  try {
-    const ctx = getAudioCtx();
-    const osc = ctx.createOscillator();
-    const vol = ctx.createGain();
-    osc.connect(vol);
-    vol.connect(ctx.destination);
-    osc.type = type;
-    osc.frequency.value = freq;
-    vol.gain.setValueAtTime(gain, ctx.currentTime);
-    vol.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
-    osc.start(ctx.currentTime);
-    osc.stop(ctx.currentTime + duration);
-  } catch (e) { /* silently ignore — user hasn't interacted yet */ }
-}
-
-function playStatusAlert(status) {
-  if (status === 'DANGER') {
-    // Urgent double-beep
-    playTone(880, 0.25, 'square', 0.35);
-    setTimeout(() => playTone(880, 0.25, 'square', 0.35), 320);
-    setTimeout(() => playTone(660, 0.4,  'square', 0.3),  700);
-  } else if (status === 'BLOCKAGE') {
-    playTone(660, 0.35, 'sawtooth', 0.25);
-    setTimeout(() => playTone(520, 0.3, 'sawtooth', 0.2), 400);
-  } else if (status === 'MODERATE') {
-    playTone(440, 0.3, 'sine', 0.2);
-  } else if (status === 'SAFE') {
-    playTone(523, 0.2, 'sine', 0.15);
+/* ════════════════════════════════════════════════════════════════
+   CHARTS UPDATE
+════════════════════════════════════════════════════════════════ */
+function updateCharts(d, ts) {
+  labels.push(ts);
+  airData.push(d.air ?? null); methaneData.push(d.methane ?? null);
+  tempData.push(d.temp ?? null); humData.push(d.humidity ?? null);
+  if (labels.length > MAX_POINTS) {
+    labels.shift(); airData.shift(); methaneData.shift(); tempData.shift(); humData.shift();
   }
+  gasChart.update(); envChart.update();
 }
 
-/* ════════════════════════════════════════════
-   STATUS BANNER + CHANGE DETECTION
-════════════════════════════════════════════ */
+/* ════════════════════════════════════════════════════════════════
+   STATUS BANNER + ALERTS
+════════════════════════════════════════════════════════════════ */
 let prevStatus = null;
 
 function updateStatus(status) {
   const cfg = STATUS_CFG[status] || STATUS_CFG.SAFE;
   const banner = document.getElementById('status-banner');
-  banner.className = `status-banner ${status}`;
+  banner.className = 'status-banner ' + status;
   document.getElementById('status-icon').textContent = cfg.icon;
   const badge = document.getElementById('status-badge');
-  badge.className = `status-badge ${status}`;
+  badge.className = 'status-badge ' + status;
   badge.textContent = status;
   document.getElementById('status-msg').textContent = cfg.msg;
 
-  // Only trigger alerts on actual status change (not OFFLINE)
   if (status !== 'OFFLINE' && status !== prevStatus && prevStatus !== null) {
-    showToast(status);
-    triggerFlash(status);
-    playStatusAlert(status);
+    showToast(status); triggerFlash(status); playStatusAlert(status);
   }
   if (status !== 'OFFLINE') prevStatus = status;
 }
 
-/* ════════════════════════════════════════════
-   CHARTS UPDATE
-════════════════════════════════════════════ */
-function updateCharts(d, ts) {
-  labels.push(ts);
-  airData.push(d.air ?? null);
-  methaneData.push(d.methane ?? null);
-  tempData.push(d.temp ?? null);
-  humData.push(d.humidity ?? null);
-
-  if (labels.length > MAX_POINTS) {
-    labels.shift();
-    airData.shift(); methaneData.shift();
-    tempData.shift(); humData.shift();
-  }
-  gasChart.update();
-  envChart.update();
+/* ════════════════════════════════════════════════════════════════
+   TOAST
+════════════════════════════════════════════════════════════════ */
+function showToast(status) {
+  const cfg  = STATUS_CFG[status] || STATUS_CFG.SAFE;
+  const wrap = document.getElementById('toast-wrap');
+  const t    = document.createElement('div');
+  t.className = 'toast toast-' + status;
+  t.innerHTML = `
+    <div class="toast-icon">${cfg.icon}</div>
+    <div class="toast-body">
+      <div class="toast-title">Status: ${status}</div>
+      <div class="toast-msg">${cfg.msg}</div>
+    </div>
+    <div class="toast-bar"></div>`;
+  wrap.appendChild(t);
+  requestAnimationFrame(() => requestAnimationFrame(() => t.classList.add('show')));
+  setTimeout(() => { t.classList.add('hide'); setTimeout(() => t.remove(), 400); }, 4000);
 }
 
-/* ════════════════════════════════════════════
-   CONNECTION STATE
-════════════════════════════════════════════ */
-let failCount = 0;
+/* ════════════════════════════════════════════════════════════════
+   FLASH
+════════════════════════════════════════════════════════════════ */
+const FLASH_COLORS = { SAFE:'rgba(29,158,117,0.18)', MODERATE:'rgba(239,159,39,0.22)', BLOCKAGE:'rgba(249,115,22,0.25)', DANGER:'rgba(226,75,74,0.30)' };
+function triggerFlash(status) {
+  const el = document.getElementById('status-flash');
+  el.style.background   = FLASH_COLORS[status] || 'transparent';
+  el.style.borderColor  = FLASH_COLORS[status] || 'transparent';
+  el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash');
+}
 
+/* ════════════════════════════════════════════════════════════════
+   AUDIO
+════════════════════════════════════════════════════════════════ */
+let audioCtx = null;
+function getAudioCtx() { if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)(); return audioCtx; }
+function playTone(freq, dur, type='sine', gain=0.3) {
+  try {
+    const ctx = getAudioCtx(), osc = ctx.createOscillator(), vol = ctx.createGain();
+    osc.connect(vol); vol.connect(ctx.destination);
+    osc.type = type; osc.frequency.value = freq;
+    vol.gain.setValueAtTime(gain, ctx.currentTime);
+    vol.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + dur);
+    osc.start(ctx.currentTime); osc.stop(ctx.currentTime + dur);
+  } catch(e) {}
+}
+function playStatusAlert(s) {
+  if (s==='DANGER')  { playTone(880,0.25,'square',0.35); setTimeout(()=>playTone(880,0.25,'square',0.35),320); setTimeout(()=>playTone(660,0.4,'square',0.3),700); }
+  else if (s==='BLOCKAGE') { playTone(660,0.35,'sawtooth',0.25); setTimeout(()=>playTone(520,0.3,'sawtooth',0.2),400); }
+  else if (s==='MODERATE') { playTone(440,0.3,'sine',0.2); }
+  else if (s==='SAFE')     { playTone(523,0.2,'sine',0.15); }
+}
+
+/* ════════════════════════════════════════════════════════════════
+   CONNECTION STATE
+════════════════════════════════════════════════════════════════ */
+let failCount = 0;
 function setOnline(ok) {
-  const badge = document.getElementById('live-badge');
-  const dot   = document.getElementById('ldot');
-  const txt   = document.getElementById('live-txt');
-  badge.className = ok ? 'live-badge' : 'live-badge offline';
-  dot.className   = ok ? 'ldot'       : 'ldot off';
-  txt.className   = ok ? 'live-txt'   : 'live-txt off';
-  txt.textContent = ok ? 'Live'       : 'Offline';
+  document.getElementById('live-badge').className = ok ? 'live-badge' : 'live-badge offline';
+  document.getElementById('ldot').className       = ok ? 'ldot'       : 'ldot off';
+  const t = document.getElementById('live-txt');
+  t.className   = ok ? 'live-txt' : 'live-txt off';
+  t.textContent = ok ? 'Live'     : 'Offline';
   if (!ok) updateStatus('OFFLINE');
 }
 
-/* ════════════════════════════════════════════
-   SIMULATE (works offline, seeds chart data)
-════════════════════════════════════════════ */
+/* ════════════════════════════════════════════════════════════════
+   SIMULATE
+════════════════════════════════════════════════════════════════ */
 const RANGES = {
-  SAFE:     { temp:[22,30], humidity:[45,65], air:[50,150],  methane:[50,200],  distance:[80,150], flow:[8,15] },
-  MODERATE: { temp:[30,38], humidity:[65,80], air:[150,300], methane:[200,500], distance:[50,80],  flow:[4,8] },
-  BLOCKAGE: { temp:[25,35], humidity:[70,85], air:[200,350], methane:[400,700], distance:[10,50],  flow:[0,3] },
-  DANGER:   { temp:[35,50], humidity:[80,99], air:[350,500], methane:[600,1000],distance:[5,15],   flow:[0,1] },
+  SAFE:     { temp:[22,30], humidity:[40,65], air:[50,190],   methane:[50,240],  distance:[80,150], flow:[7,15]  },
+  MODERATE: { temp:[30,38], humidity:[65,80], air:[200,340],  methane:[250,440], distance:[50,80],  flow:[3,6]   },
+  BLOCKAGE: { temp:[25,35], humidity:[70,85], air:[350,590],  methane:[450,690], distance:[20,50],  flow:[0.5,3] },
+  DANGER:   { temp:[38,50], humidity:[80,99], air:[600,1200], methane:[700,1400],distance:[5,20],   flow:[0,1]   },
 };
-
 function generateReading(forceStatus) {
   const pool = ['SAFE','SAFE','SAFE','MODERATE','BLOCKAGE','DANGER'];
   const status = forceStatus || pool[Math.floor(Math.random() * pool.length)];
-  const r = RANGES[status];
-  const rnd = (a, b) => Math.random() * (b - a) + a;
-  return {
-    temp: rnd(...r.temp), humidity: rnd(...r.humidity),
-    air:  rnd(...r.air),  methane:  rnd(...r.methane),
-    distance: rnd(...r.distance), flow: rnd(...r.flow),
-    status,
-  };
+  const r = RANGES[status], rnd = (a,b) => Math.random()*(b-a)+a;
+  return { temp:rnd(...r.temp), humidity:rnd(...r.humidity), air:rnd(...r.air),
+           methane:rnd(...r.methane), distance:rnd(...r.distance), flow:rnd(...r.flow), status };
 }
+function simulateReading() { processReading(generateReading()); }
 
+/* ════════════════════════════════════════════════════════════════
+   PROCESS A READING  (shared between fetch & simulate)
+════════════════════════════════════════════════════════════════ */
 function processReading(d) {
   const ts = new Date().toLocaleTimeString([], { hour:'2-digit', minute:'2-digit', second:'2-digit' });
   document.getElementById('last-upd').textContent = ts;
   updateSensors(d);
   updateStatus((d.status || 'SAFE').toUpperCase());
   updateCharts(d, ts);
-  pushHistory(d, ts);
+  pushDashHistory(d, ts);
+  pushToHistory(d, ts);
 }
 
-function simulateReading() {
-  const d = generateReading();
-  processReading(d);
-}
-
-/* ════════════════════════════════════════════
+/* ════════════════════════════════════════════════════════════════
    FETCH FROM API
-   (AbortController instead of AbortSignal.timeout for broader browser support)
-════════════════════════════════════════════ */
+════════════════════════════════════════════════════════════════ */
 async function fetchData() {
   const ctrl = new AbortController();
   const tid  = setTimeout(() => ctrl.abort(), 5000);
@@ -859,17 +1107,12 @@ async function fetchData() {
     const res  = await fetch(API_URL, { signal: ctrl.signal });
     clearTimeout(tid);
     if (!res.ok) throw new Error('HTTP ' + res.status);
-
     const raw  = await res.json();
     const rows = Array.isArray(raw) ? raw : (raw ? [raw] : []);
     if (!rows.length) return;
-
-    failCount = 0;
-    setOnline(true);
-
-    const d = rows[rows.length - 1];  // latest
+    failCount = 0; setOnline(true);
+    const d = rows[rows.length - 1];
     processReading(d);
-
   } catch (e) {
     clearTimeout(tid);
     failCount++;
@@ -878,33 +1121,24 @@ async function fetchData() {
   }
 }
 
-/* ════════════════════════════════════════════
-   BOOT — seed charts with safe demo data so they're never blank
-════════════════════════════════════════════ */
+/* ════════════════════════════════════════════════════════════════
+   BOOT  — seed charts with SAFE demo data so they're never blank
+════════════════════════════════════════════════════════════════ */
 for (let i = 0; i < 8; i++) {
   setTimeout(() => {
     const demo = generateReading('SAFE');
-    const ts = new Date(Date.now() - (7 - i) * REFRESH_MS)
-               .toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',second:'2-digit'});
+    const ts = new Date(Date.now() - (7-i)*REFRESH_MS)
+                  .toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',second:'2-digit'});
     labels.push(ts);
-    airData.push(demo.air);     methaneData.push(demo.methane);
-    tempData.push(demo.temp);   humData.push(demo.humidity);
+    airData.push(demo.air); methaneData.push(demo.methane);
+    tempData.push(demo.temp); humData.push(demo.humidity);
   }, i * 30);
 }
-
 setTimeout(() => {
-  gasChart.update();
-  envChart.update();
+  gasChart.update(); envChart.update();
   fetchData();
   setInterval(fetchData, REFRESH_MS);
 }, 300);
 </script>
-
-<!-- Screen Flash Overlay -->
-<div id="status-flash"></div>
-
-<!-- Toast Container -->
-<div id="toast-wrap" role="status" aria-live="polite"></div>
-
 </body>
 </html>

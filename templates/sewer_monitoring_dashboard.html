@@ -1,0 +1,348 @@
+
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #0d1117; font-family: var(--font-sans, system-ui, sans-serif); color: #e6edf3; }
+  .dash { background: #0d1117; min-height: 100vh; padding: 20px; }
+  .header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; padding-bottom: 16px; border-bottom: 0.5px solid rgba(255,255,255,0.1); }
+  .logo { display: flex; align-items: center; gap: 10px; }
+  .logo-icon { width: 32px; height: 32px; background: #1a6b4a; border-radius: 8px; display: flex; align-items: center; justify-content: center; }
+  .logo-icon svg { width: 18px; height: 18px; }
+  .title { font-size: 16px; font-weight: 500; color: #e6edf3; }
+  .subtitle { font-size: 11px; color: #7d8590; }
+  .header-right { display: flex; align-items: center; gap: 12px; }
+  .live-dot { width: 8px; height: 8px; border-radius: 50%; background: #1d9e75; animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+  .live-text { font-size: 12px; color: #1d9e75; }
+  .last-update { font-size: 11px; color: #7d8590; }
+
+  .status-banner { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-radius: 10px; margin-bottom: 20px; }
+  .status-banner.safe { background: rgba(29,158,117,0.12); border: 0.5px solid rgba(29,158,117,0.3); }
+  .status-banner.moderate { background: rgba(239,159,39,0.12); border: 0.5px solid rgba(239,159,39,0.3); }
+  .status-banner.blockage { background: rgba(186,117,23,0.12); border: 0.5px solid rgba(186,117,23,0.3); }
+  .status-banner.danger { background: rgba(226,75,74,0.12); border: 0.5px solid rgba(226,75,74,0.3); }
+  .status-badge { padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 500; letter-spacing: 0.5px; }
+  .badge-safe { background: rgba(29,158,117,0.2); color: #1d9e75; }
+  .badge-moderate { background: rgba(239,159,39,0.2); color: #ef9f27; }
+  .badge-blockage { background: rgba(186,117,23,0.2); color: #fa9a00; }
+  .badge-danger { background: rgba(226,75,74,0.2); color: #e24b4a; }
+  .status-msg { font-size: 13px; color: #b0bec5; }
+  .status-icon { font-size: 18px; }
+
+  .sensor-grid { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 12px; margin-bottom: 20px; }
+  @media(max-width:600px){ .sensor-grid { grid-template-columns: repeat(2, minmax(0,1fr)); } }
+  .sensor-card { background: #161b22; border: 0.5px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 14px 16px; }
+  .sensor-label { font-size: 11px; color: #7d8590; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .sensor-value { font-size: 22px; font-weight: 500; line-height: 1.2; }
+  .sensor-unit { font-size: 12px; color: #7d8590; margin-top: 2px; }
+  .sensor-bar { height: 3px; border-radius: 2px; background: rgba(255,255,255,0.07); margin-top: 10px; overflow: hidden; }
+  .sensor-bar-fill { height: 100%; border-radius: 2px; transition: width 0.8s ease; }
+  .val-temp { color: #ef9f27; }
+  .val-humidity { color: #378add; }
+  .val-air { color: #e24b4a; }
+  .val-methane { color: #d4537e; }
+  .val-distance { color: #1d9e75; }
+  .val-flow { color: #7f77dd; }
+  .bar-temp { background: #ef9f27; }
+  .bar-humidity { background: #378add; }
+  .bar-air { background: #e24b4a; }
+  .bar-methane { background: #d4537e; }
+  .bar-distance { background: #1d9e75; }
+  .bar-flow { background: #7f77dd; }
+
+  .charts-row { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 12px; margin-bottom: 20px; }
+  @media(max-width:600px){ .charts-row { grid-template-columns: 1fr; } }
+  .chart-card { background: #161b22; border: 0.5px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 14px 16px; }
+  .chart-title { font-size: 12px; color: #7d8590; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
+
+  .bottom-row { display: grid; grid-template-columns: minmax(0,2fr) minmax(0,1fr); gap: 12px; }
+  @media(max-width:600px){ .bottom-row { grid-template-columns: 1fr; } }
+
+  .history-card { background: #161b22; border: 0.5px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 14px 16px; }
+  .history-title { font-size: 12px; color: #7d8590; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .history-table { width: 100%; font-size: 12px; border-collapse: collapse; }
+  .history-table th { color: #7d8590; font-weight: 400; padding: 6px 8px; text-align: left; border-bottom: 0.5px solid rgba(255,255,255,0.06); }
+  .history-table td { padding: 7px 8px; border-bottom: 0.5px solid rgba(255,255,255,0.04); color: #b0bec5; }
+  .history-table tr:last-child td { border-bottom: none; }
+  .tbl-status { padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 500; }
+
+  .api-card { background: #161b22; border: 0.5px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 14px 16px; }
+  .api-title { font-size: 12px; color: #7d8590; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .endpoint { display: flex; align-items: center; gap: 8px; padding: 8px 10px; background: rgba(255,255,255,0.03); border-radius: 6px; margin-bottom: 8px; cursor: pointer; transition: background 0.15s; }
+  .endpoint:hover { background: rgba(255,255,255,0.07); }
+  .method { font-size: 11px; font-weight: 500; padding: 2px 7px; border-radius: 4px; min-width: 36px; text-align: center; }
+  .m-get { background: rgba(29,158,117,0.2); color: #1d9e75; }
+  .m-post { background: rgba(55,138,221,0.2); color: #378add; }
+  .ep-path { font-size: 12px; color: #e6edf3; font-family: var(--font-mono, monospace); }
+  .ep-desc { font-size: 11px; color: #7d8590; margin-top: 2px; }
+
+  .sim-btn { width: 100%; margin-top: 12px; padding: 9px; background: rgba(29,158,117,0.12); border: 0.5px solid rgba(29,158,117,0.3); border-radius: 8px; color: #1d9e75; font-size: 13px; cursor: pointer; transition: background 0.15s; }
+  .sim-btn:hover { background: rgba(29,158,117,0.22); }
+  .sim-btn:active { transform: scale(0.98); }
+</style>
+
+<h2 class="sr-only" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);">Smart Sewer Monitoring System dashboard showing live sensor readings, status, and charts.</h2>
+
+<div class="dash">
+  <div class="header">
+    <div class="logo">
+      <div class="logo-icon">
+        <svg viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="9" cy="9" r="6" stroke="#1d9e75" stroke-width="1.5"/>
+          <path d="M5 9 Q7 6 9 9 Q11 12 13 9" stroke="#1d9e75" stroke-width="1.5" stroke-linecap="round" fill="none"/>
+        </svg>
+      </div>
+      <div>
+        <div class="title">Smart Sewer Monitor</div>
+        <div class="subtitle">ESP32 · Firebase · ML Prediction</div>
+      </div>
+    </div>
+    <div class="header-right">
+      <div class="live-dot"></div>
+      <span class="live-text">Live</span>
+      <span class="last-update" id="last-update">--:--:--</span>
+    </div>
+  </div>
+
+  <div class="status-banner safe" id="status-banner">
+    <span class="status-icon" id="status-icon">✅</span>
+    <span class="status-badge badge-safe" id="status-badge">SAFE</span>
+    <span class="status-msg" id="status-msg">All parameters are within normal range. System operating normally.</span>
+  </div>
+
+  <div class="sensor-grid">
+    <div class="sensor-card">
+      <div class="sensor-label">Temperature</div>
+      <div class="sensor-value val-temp" id="val-temp">--</div>
+      <div class="sensor-unit">°C</div>
+      <div class="sensor-bar"><div class="sensor-bar-fill bar-temp" id="bar-temp" style="width:0%"></div></div>
+    </div>
+    <div class="sensor-card">
+      <div class="sensor-label">Humidity</div>
+      <div class="sensor-value val-humidity" id="val-humidity">--</div>
+      <div class="sensor-unit">% RH</div>
+      <div class="sensor-bar"><div class="sensor-bar-fill bar-humidity" id="bar-humidity" style="width:0%"></div></div>
+    </div>
+    <div class="sensor-card">
+      <div class="sensor-label">Air Quality (MQ-135)</div>
+      <div class="sensor-value val-air" id="val-air">--</div>
+      <div class="sensor-unit">ppm</div>
+      <div class="sensor-bar"><div class="sensor-bar-fill bar-air" id="bar-air" style="width:0%"></div></div>
+    </div>
+    <div class="sensor-card">
+      <div class="sensor-label">Methane (MQ-4)</div>
+      <div class="sensor-value val-methane" id="val-methane">--</div>
+      <div class="sensor-unit">ppm</div>
+      <div class="sensor-bar"><div class="sensor-bar-fill bar-methane" id="bar-methane" style="width:0%"></div></div>
+    </div>
+    <div class="sensor-card">
+      <div class="sensor-label">Water Level</div>
+      <div class="sensor-value val-distance" id="val-distance">--</div>
+      <div class="sensor-unit">cm (ultrasonic)</div>
+      <div class="sensor-bar"><div class="sensor-bar-fill bar-distance" id="bar-distance" style="width:0%"></div></div>
+    </div>
+    <div class="sensor-card">
+      <div class="sensor-label">Flow Rate</div>
+      <div class="sensor-value val-flow" id="val-flow">--</div>
+      <div class="sensor-unit">L/min</div>
+      <div class="sensor-bar"><div class="sensor-bar-fill bar-flow" id="bar-flow" style="width:0%"></div></div>
+    </div>
+  </div>
+
+  <div class="charts-row">
+    <div class="chart-card">
+      <div class="chart-title">Gas levels (ppm)</div>
+      <div style="position:relative;height:160px;">
+        <canvas id="gasChart" role="img" aria-label="Line chart of air quality and methane levels over time">Gas sensor readings over time.</canvas>
+      </div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Temperature & Humidity</div>
+      <div style="position:relative;height:160px;">
+        <canvas id="envChart" role="img" aria-label="Line chart of temperature and humidity over time">Temp and humidity trends.</canvas>
+      </div>
+    </div>
+  </div>
+
+  <div class="bottom-row">
+    <div class="history-card">
+      <div class="history-title">Recent readings</div>
+      <table class="history-table">
+        <thead>
+          <tr>
+            <th>Time</th><th>Temp</th><th>Air</th><th>CH₄</th><th>Flow</th><th>Status</th>
+          </tr>
+        </thead>
+        <tbody id="history-body">
+          <tr><td colspan="6" style="text-align:center;color:#7d8590;padding:16px;">Waiting for data...</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="api-card">
+      <div class="api-title">API Endpoints</div>
+      <div class="endpoint">
+        <div>
+          <div style="display:flex;align-items:center;gap:8px;"><span class="method m-get">GET</span><span class="ep-path">/</span></div>
+          <div class="ep-desc">Web dashboard</div>
+        </div>
+      </div>
+      <div class="endpoint">
+        <div>
+          <div style="display:flex;align-items:center;gap:8px;"><span class="method m-post">POST</span><span class="ep-path">/data</span></div>
+          <div class="ep-desc">ESP32 pushes sensor data</div>
+        </div>
+      </div>
+      <div class="endpoint">
+        <div>
+          <div style="display:flex;align-items:center;gap:8px;"><span class="method m-get">GET</span><span class="ep-path">/get-data</span></div>
+          <div class="ep-desc">Dashboard polls latest</div>
+        </div>
+      </div>
+      <button class="sim-btn" onclick="simulateReading()">↻ Simulate ESP32 Reading</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script>
+const MAX_POINTS = 20;
+const labels = [];
+const airData = [], methaneData = [], tempData = [], humidityData = [];
+let historyRows = [];
+
+const statusConfig = {
+  SAFE:     { cls:'safe',     badge:'badge-safe',     icon:'✅', msg:'All parameters within normal range. System operating normally.' },
+  MODERATE: { cls:'moderate', badge:'badge-moderate', icon:'⚠️', msg:'Elevated readings detected. Monitor the system closely.' },
+  BLOCKAGE: { cls:'blockage', badge:'badge-blockage', icon:'🚧', msg:'Flow blocked — inspect sewer line immediately.' },
+  DANGER:   { cls:'danger',   badge:'badge-danger',   icon:'🚨', msg:'Critical gas or overflow detected. Take immediate action!' },
+};
+
+const chartDefaults = {
+  responsive: true,
+  maintainAspectRatio: false,
+  plugins: { legend: { display: false } },
+  animation: { duration: 400 },
+  scales: {
+    x: { ticks: { color: '#7d8590', font: { size: 10 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 6 }, grid: { color: 'rgba(255,255,255,0.04)' } },
+    y: { ticks: { color: '#7d8590', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,0.04)' } }
+  }
+};
+
+const gasChart = new Chart(document.getElementById('gasChart'), {
+  type: 'line',
+  data: {
+    labels,
+    datasets: [
+      { label: 'Air Quality', data: airData, borderColor: '#e24b4a', borderWidth: 1.5, pointRadius: 0, tension: 0.4, borderDash: [], fill: false },
+      { label: 'Methane', data: methaneData, borderColor: '#d4537e', borderWidth: 1.5, pointRadius: 0, tension: 0.4, borderDash: [4,3], fill: false }
+    ]
+  },
+  options: { ...chartDefaults }
+});
+
+const envChart = new Chart(document.getElementById('envChart'), {
+  type: 'line',
+  data: {
+    labels,
+    datasets: [
+      { label: 'Temperature', data: tempData, borderColor: '#ef9f27', borderWidth: 1.5, pointRadius: 0, tension: 0.4, fill: false },
+      { label: 'Humidity', data: humidityData, borderColor: '#378add', borderWidth: 1.5, pointRadius: 0, tension: 0.4, borderDash: [4,3], fill: false }
+    ]
+  },
+  options: { ...chartDefaults }
+});
+
+function updateCharts(d) {
+  const t = new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit', second:'2-digit'});
+  labels.push(t);
+  airData.push(d.air);
+  methaneData.push(d.methane);
+  tempData.push(d.temp);
+  humidityData.push(d.humidity);
+  if (labels.length > MAX_POINTS) {
+    labels.shift(); airData.shift(); methaneData.shift(); tempData.shift(); humidityData.shift();
+  }
+  gasChart.update();
+  envChart.update();
+}
+
+function updateSensors(d) {
+  document.getElementById('val-temp').textContent = d.temp.toFixed(1);
+  document.getElementById('val-humidity').textContent = d.humidity.toFixed(1);
+  document.getElementById('val-air').textContent = Math.round(d.air);
+  document.getElementById('val-methane').textContent = Math.round(d.methane);
+  document.getElementById('val-distance').textContent = d.distance.toFixed(1);
+  document.getElementById('val-flow').textContent = d.flow.toFixed(2);
+  document.getElementById('bar-temp').style.width = Math.min(100, (d.temp / 60) * 100) + '%';
+  document.getElementById('bar-humidity').style.width = Math.min(100, d.humidity) + '%';
+  document.getElementById('bar-air').style.width = Math.min(100, (d.air / 500) * 100) + '%';
+  document.getElementById('bar-methane').style.width = Math.min(100, (d.methane / 1000) * 100) + '%';
+  document.getElementById('bar-distance').style.width = Math.min(100, (d.distance / 200) * 100) + '%';
+  document.getElementById('bar-flow').style.width = Math.min(100, (d.flow / 20) * 100) + '%';
+  document.getElementById('last-update').textContent = new Date().toLocaleTimeString();
+}
+
+function updateStatus(status) {
+  const cfg = statusConfig[status] || statusConfig.SAFE;
+  const banner = document.getElementById('status-banner');
+  banner.className = 'status-banner ' + cfg.cls;
+  document.getElementById('status-icon').textContent = cfg.icon;
+  const badge = document.getElementById('status-badge');
+  badge.className = 'status-badge ' + cfg.badge;
+  badge.textContent = status;
+  document.getElementById('status-msg').textContent = cfg.msg;
+}
+
+function statusStyle(s) {
+  const map = { SAFE:'background:rgba(29,158,117,0.15);color:#1d9e75', MODERATE:'background:rgba(239,159,39,0.15);color:#ef9f27', BLOCKAGE:'background:rgba(250,154,0,0.15);color:#fa9a00', DANGER:'background:rgba(226,75,74,0.15);color:#e24b4a' };
+  return map[s] || map.SAFE;
+}
+
+function updateHistory(d) {
+  const t = new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit', second:'2-digit'});
+  historyRows.unshift({ t, temp: d.temp.toFixed(1), air: Math.round(d.air), methane: Math.round(d.methane), flow: d.flow.toFixed(2), status: d.status });
+  if (historyRows.length > 8) historyRows.pop();
+  const tbody = document.getElementById('history-body');
+  tbody.innerHTML = historyRows.map(r => `
+    <tr>
+      <td>${r.t}</td>
+      <td>${r.temp}°C</td>
+      <td>${r.air}</td>
+      <td>${r.methane}</td>
+      <td>${r.flow}</td>
+      <td><span class="tbl-status" style="${statusStyle(r.status)}">${r.status}</span></td>
+    </tr>
+  `).join('');
+}
+
+function generateReading(forceStatus) {
+  const statuses = ['SAFE','SAFE','SAFE','MODERATE','BLOCKAGE','DANGER'];
+  const status = forceStatus || statuses[Math.floor(Math.random() * statuses.length)];
+  const base = {
+    SAFE:     { temp:[22,30], humidity:[45,65], air:[50,150], methane:[50,200], distance:[80,150], flow:[8,15] },
+    MODERATE: { temp:[30,38], humidity:[65,80], air:[150,300], methane:[200,500], distance:[50,80], flow:[4,8] },
+    BLOCKAGE: { temp:[25,35], humidity:[70,85], air:[200,350], methane:[400,700], distance:[10,50], flow:[0,3] },
+    DANGER:   { temp:[35,50], humidity:[80,99], air:[350,500], methane:[600,1000], distance:[5,15], flow:[0,1] },
+  };
+  const r = base[status];
+  const rand = (min, max) => Math.random() * (max - min) + min;
+  return { temp: rand(...r.temp), humidity: rand(...r.humidity), air: rand(...r.air), methane: rand(...r.methane), distance: rand(...r.distance), flow: rand(...r.flow), status };
+}
+
+function processReading(d) {
+  updateSensors(d);
+  updateStatus(d.status);
+  updateCharts(d);
+  updateHistory(d);
+}
+
+function simulateReading() {
+  const d = generateReading();
+  processReading(d);
+}
+
+// Auto-simulate every 4 seconds
+for (let i = 0; i < 8; i++) {
+  setTimeout(() => processReading(generateReading('SAFE')), i * 100);
+}
+setInterval(simulateReading, 4000);
+</script>

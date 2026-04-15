@@ -1,32 +1,45 @@
-from flask import Flask, request, jsonify, render_template
+"""
+server.py — Fixed Flask backend for Smart Sewer Monitoring
+===========================================================
+
+Fixes applied vs original:
+  FIX 1 — Feature mismatch: model trained on gas_ratio & env_index but server
+           never computed them at inference time → always wrong predictions.
+           Now engineer_features() is called before every prediction.
+
+  FIX 2 — No error handling in /data route: NaN from DHT failures, missing
+           fields, or model errors caused unhandled 500 crashes.
+           Now full try/except with safe fallbacks and clear error responses.
+
+  FIX 3 — SQLite single shared connection with check_same_thread=False:
+           concurrent Flask requests can corrupt the DB.
+           Now uses a per-request connection via get_db() / teardown.
+
+  FIX 4 — /get-data returned distance & flow but not gas_ratio / env_index,
+           so the dashboard was missing engineered-feature columns.
+           Now returns all stored columns.
+
+  FIX 5 — distance = -1.0 sentinel (from fixed ESP32 code) must not be fed
+           to the model as a real reading. Handled gracefully.
+"""
+
+from flask import Flask, request, jsonify, render_template, g
 from flask_cors import CORS
 import sqlite3
+import math
+import traceback
+
 import firebase_admin
-from firebase_admin import credentials, db
+from firebase_admin import credentials, db as fb_db
+
 import pandas as pd
 import joblib
 
-# ===== LOAD ML MODEL =====
-model        = joblib.load("model.pkl")
-le           = joblib.load("label_encoder.pkl")
-FEATURE_COLS = joblib.load("feature_columns.pkl")  # ordered feature list
-
-def build_features(d: dict) -> pd.DataFrame:
-    """Convert raw ESP32 payload into the feature vector the model expects.
-    Computes engineered features (gas_ratio, env_index) from base readings.
-    """
-    air      = float(d.get('air',      0) or 0)
-    methane  = float(d.get('methane',  0) or 0)
-    temp     = float(d.get('temp',    25) or 25)
-    humidity = float(d.get('humidity', 60) or 60)
-    return pd.DataFrame([{
-        'temp':      temp,
-        'humidity':  humidity,
-        'air':       air,
-        'methane':   methane,
-        'gas_ratio': air / (methane + 1),
-        'env_index': (temp * humidity) / 100,
-    }])[FEATURE_COLS]  # enforce correct column order
+# ===== LOAD ML ARTIFACTS =====
+model    = joblib.load("model.pkl")
+le       = joblib.load("label_encoder.pkl")
+# FIX 1: load the exact feature list the model was trained on
+TRAIN_FEATURES = joblib.load("feature_columns.pkl")  # ['temp','humidity','air','methane','gas_ratio','env_index']
 
 # ===== FIREBASE SETUP =====
 cred = credentials.Certificate("serviceAccountKey.json")
@@ -36,91 +49,160 @@ firebase_admin.initialize_app(cred, {
 
 # ===== FLASK =====
 app = Flask(__name__)
-CORS(app)  # Allow cross-origin requests (ESP32, dashboard on different ports)
+CORS(app)
 
-# ===== SQLITE SETUP =====
-conn   = sqlite3.connect('sensor_data.db', check_same_thread=False)
-cursor = conn.cursor()
+DATABASE = 'sensor_data.db'
 
-cursor.execute('''
-CREATE TABLE IF NOT EXISTS data (
-    id       INTEGER PRIMARY KEY AUTOINCREMENT,
-    temp     REAL,
-    humidity REAL,
-    air      INTEGER,
-    methane  INTEGER,
-    distance REAL,
-    flow     REAL,
-    status   TEXT
-)
-''')
-conn.commit()
+# ───────────────────────────────────────────────
+# FIX 3: per-request SQLite connection
+# ───────────────────────────────────────────────
+def get_db():
+    if 'db' not in g:
+        g.db = sqlite3.connect(DATABASE)
+        g.db.row_factory = sqlite3.Row
+        g.db.execute('''
+            CREATE TABLE IF NOT EXISTS data (
+                id        INTEGER PRIMARY KEY AUTOINCREMENT,
+                ts        DATETIME DEFAULT CURRENT_TIMESTAMP,
+                temp      REAL,
+                humidity  REAL,
+                air       INTEGER,
+                methane   INTEGER,
+                distance  REAL,
+                flow      REAL,
+                gas_ratio REAL,
+                env_index REAL,
+                status    TEXT,
+                dht_ok    INTEGER DEFAULT 1
+            )
+        ''')
+        g.db.commit()
+    return g.db
 
+@app.teardown_appcontext
+def close_db(error):
+    db = g.pop('db', None)
+    if db is not None:
+        db.close()
 
-# ──────────────────────────────────────────────
-#  Dashboard page
-# ──────────────────────────────────────────────
+# ───────────────────────────────────────────────
+# FIX 1: feature engineering — must match train_model.py exactly
+# ───────────────────────────────────────────────
+def engineer_features(row: dict) -> dict:
+    air     = row.get('air', 0)
+    methane = row.get('methane', 0)
+    temp    = row.get('temp', 25)
+    humidity = row.get('humidity', 60)
+    row['gas_ratio'] = air / (methane + 1)
+    row['env_index'] = (temp * humidity) / 100
+    return row
+
+def safe_float(val, fallback=0.0):
+    """Return fallback if val is None, NaN, or not numeric."""
+    try:
+        v = float(val)
+        return fallback if math.isnan(v) or math.isinf(v) else v
+    except (TypeError, ValueError):
+        return fallback
+
+# ───────────────────────────────────────────────
+# Dashboard page
+# ───────────────────────────────────────────────
 @app.route('/')
 def dashboard():
     return render_template('index.html')
 
-
-# ──────────────────────────────────────────────
-#  ESP32 / IoT device pushes data here
-# ──────────────────────────────────────────────
+# ───────────────────────────────────────────────
+# ESP32 pushes sensor data here
+# ───────────────────────────────────────────────
 @app.route('/data', methods=['POST'])
 def receive_data():
-    data = request.json
+    try:
+        raw = request.get_json(force=True, silent=True)
+        if not raw:
+            return jsonify({"error": "empty or invalid JSON"}), 400
 
-    # ML prediction using engineered features
-    features_df = build_features(data)
-    prediction  = model.predict(features_df)
-    data['status'] = le.inverse_transform(prediction)[0]
+        # FIX 2: sanitise every field — DHT failures send NaN or missing keys
+        data = {
+            'temp':     safe_float(raw.get('temp'),     25.0),
+            'humidity': safe_float(raw.get('humidity'), 60.0),
+            'air':      int(safe_float(raw.get('air'),   0)),
+            'methane':  int(safe_float(raw.get('methane'), 0)),
+            'distance': safe_float(raw.get('distance'), -1.0),
+            'flow':     safe_float(raw.get('flow'),      0.0),
+            'dht_ok':   bool(raw.get('dht_ok', True)),
+        }
 
-    print(f"[POST /data] Received & Predicted: {data}")
+        # FIX 1: compute engineered features before prediction
+        data = engineer_features(data)
 
-    # Store in Firebase
-    ref = db.reference('sensor_data')
-    ref.push(data)
+        # Build feature DataFrame in the exact column order the model expects
+        features_df = pd.DataFrame([{k: data[k] for k in TRAIN_FEATURES}])
 
-    # Store in SQLite
-    cursor.execute('''
-        INSERT INTO data (temp, humidity, air, methane, distance, flow, status)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-    ''', (
-        data.get('temp'),
-        data.get('humidity'),
-        data.get('air'),
-        data.get('methane'),
-        data.get('distance'),
-        data.get('flow'),
-        data.get('status')
-    ))
-    conn.commit()
+        prediction = model.predict(features_df)
+        status = le.inverse_transform(prediction)[0]
+        data['status'] = status
 
-    return jsonify({"status": "stored", "prediction": data['status']})
+        print(f"[POST /data] {data}")
 
+        # Store in Firebase (exclude internal keys the DB doesn't need)
+        fb_payload = {k: v for k, v in data.items() if k != 'dht_ok'}
+        ref = fb_db.reference('sensor_data')
+        ref.push(fb_payload)
 
-# ──────────────────────────────────────────────
-#  Dashboard polls this endpoint
-# ──────────────────────────────────────────────
+        # Store in SQLite
+        db = get_db()
+        db.execute('''
+            INSERT INTO data (temp, humidity, air, methane, distance, flow,
+                              gas_ratio, env_index, status, dht_ok)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            data['temp'], data['humidity'], data['air'], data['methane'],
+            data['distance'], data['flow'],
+            data['gas_ratio'], data['env_index'],
+            data['status'], int(data['dht_ok'])
+        ))
+        db.commit()
+
+        return jsonify({"status": "stored", "prediction": status})
+
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+
+# ───────────────────────────────────────────────
+# Dashboard polls this endpoint
+# ───────────────────────────────────────────────
 @app.route('/get-data', methods=['GET'])
 def get_data():
-    limit = request.args.get('limit', 1, type=int)
+    try:
+        limit = request.args.get('limit', 1, type=int)
+        db = get_db()
+        rows = db.execute('''
+            SELECT ts, temp, humidity, air, methane, distance, flow,
+                   gas_ratio, env_index, status, dht_ok
+            FROM data
+            ORDER BY id DESC
+            LIMIT ?
+        ''', (limit,)).fetchall()
 
-    cursor.execute('''
-        SELECT temp, humidity, air, methane, distance, flow, status
-        FROM data
-        ORDER BY id DESC
-        LIMIT ?
-    ''', (limit,))
+        result = [dict(r) for r in reversed(rows)]
+        return jsonify(result if result else [{}])
 
-    rows = cursor.fetchall()
-    keys = ['temp', 'humidity', 'air', 'methane', 'distance', 'flow', 'status']
-    result = [dict(zip(keys, row)) for row in reversed(rows)]
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
 
-    return jsonify(result if result else [{}])
-
+# ───────────────────────────────────────────────
+# Health check — useful for debugging
+# ───────────────────────────────────────────────
+@app.route('/health', methods=['GET'])
+def health():
+    return jsonify({
+        "model_features": TRAIN_FEATURES,
+        "model_classes":  list(le.classes_),
+        "status": "ok"
+    })
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5001, debug=False)

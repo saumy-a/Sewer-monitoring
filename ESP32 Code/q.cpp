@@ -33,6 +33,12 @@ const char* serverName = "http://10.205.23.59:5001/data";
 #define MQ135_CLEAN_AIR_RAW  368    // calibrated to your room
 #define MQ4_CLEAN_AIR_RAW   1593    // calibrated to your room
 
+// ===================================================================
+// STEP 3 — Container Calibration
+// The actual distance (cm) the sensor reads when the container is EMPTY.
+// ===================================================================
+#define EMPTY_CONTAINER_CM  9.9f
+
 DHT dht(DHTPIN, DHTTYPE);
 
 // ===== FLOW SENSOR =====
@@ -132,10 +138,10 @@ void loop() {
   long duration = pulseIn(ECHO_PIN, HIGH, 30000UL);
   float distance = -1.0f; // this will now store Water Depth
   if (duration > 0) {
-    float rawDistance = duration * 0.034f / 2.0f; // distance from lid to water
-    distance = 11.0f - rawDistance; // calculate water depth
+    float rawDistance = duration * 0.034f / 2.0f; // distance from lid to bottom
+    distance = EMPTY_CONTAINER_CM - rawDistance;  // calculate water depth
     if (distance < 0) distance = 0.0f; // clamp empty
-    if (distance > 11.0f) distance = 11.0f; // clamp full
+    if (distance > EMPTY_CONTAINER_CM) distance = EMPTY_CONTAINER_CM; // clamp full
   } else {
     Serial.println("[WARN] Ultrasonic timeout — depth set to -1 (invalid)");
   }

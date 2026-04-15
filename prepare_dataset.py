@@ -17,9 +17,9 @@ iot_telemetry_data.csv mapping:
   60         → distance (fixed reasonable sewer water depth in cm, no sensor in dataset)
 
 Status labels assigned by gas threshold rules matching our ESP32 logic:
-  air>600 or methane>700  → DANGER
-  air>350 or methane>450  → BLOCKAGE
-  air>200 or methane>250  → MODERATE
+  air>500 or methane>1000  → DANGER
+  air>300 or methane>200  → BLOCKAGE
+  air>150 or methane>50  → MODERATE
   else                    → SAFE
 """
 
@@ -35,18 +35,18 @@ iot = iot.dropna(subset=['temp','humidity','co','smoke','lpg'])
 iot_mapped = pd.DataFrame({
     'temp':     iot['temp'].round(2),
     'humidity': iot['humidity'].round(2),
-    'air':      (iot['co']    * 70000).round(0).astype(int),
-    'methane':  (iot['smoke'] * 20000).round(0).astype(int),
+    'air':      ((iot['co'] - 0.0011) / 0.0134 * 800).round(0).clip(0, 1500).astype(int),
+    'methane':  ((iot['smoke'] - 0.0066) / 0.0400 * 1400).round(0).clip(0, 2000).astype(int),
     'distance': 60.0,                           # fixed proxy
     'flow':     (iot['lpg']   * 2000).round(2), # L/min proxy
 })
 
 def assign_status(row):
-    if row['air'] > 600 or row['methane'] > 700:
+    if row['air'] > 500 or row['methane'] > 1000:
         return 'DANGER'
-    elif row['air'] > 350 or row['methane'] > 450:
+    elif row['air'] > 300 or row['methane'] > 200:
         return 'BLOCKAGE'
-    elif row['air'] > 200 or row['methane'] > 250:
+    elif row['air'] > 150 or row['methane'] > 50:
         return 'MODERATE'
     return 'SAFE'
 

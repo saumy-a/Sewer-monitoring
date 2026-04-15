@@ -47,15 +47,15 @@ void IRAM_ATTR pulseCounter() {
 unsigned long lastLoopTime = 0;
 
 // ===================================================================
-// mapSensor() — converts raw ADC to 0-1500 scale relative to
+// mapSensor() — converts raw ADC to 0-2000 scale relative to
 // clean-air baseline. Values at or below baseline map to 0.
-// Values above baseline scale linearly up to 1500.
+// Values above baseline scale linearly up to 2000.
 // ===================================================================
 int mapSensor(int rawValue, int cleanAirBaseline) {
   int delta = rawValue - cleanAirBaseline;
   if (delta <= 0) return 0;
   int maxDelta = 4095 - cleanAirBaseline;
-  return (int)((float)delta / maxDelta * 1500.0f);
+  return (int)((float)delta / maxDelta * 2000.0f);
 }
 
 void setup() {

@@ -133,9 +133,9 @@ THRESHOLDS = {
     'air_blockage':      300,   # meaningful air-quality degradation
     'air_danger':        500,   # serious air quality — act soon
 
-    'ch4_moderate':      100,   # trace methane detectable
-    'ch4_blockage':      300,   # elevated methane — likely decomposition
-    'ch4_danger':        600,   # high methane — evacuation risk
+    'ch4_moderate':       50,   # detect poor ventilation
+    'ch4_blockage':      200,   # high concentration/stagnant
+    'ch4_danger':       1000,   # extreme accumulation
 
     # Water level (distance from sensor to water surface, cm)
     # Lower distance = higher water = worse

@@ -57,12 +57,12 @@ rng = np.random.default_rng(42)
 def assign_status(air: pd.Series, methane: pd.Series) -> pd.Series:
     """Domain-expert threshold labels (used ONLY for synthetic IoT rows)."""
     status = pd.Series('SAFE', index=air.index)
-    status[air > 200]  = 'MODERATE'
-    status[methane > 250] = 'MODERATE'
-    status[air > 350]  = 'BLOCKAGE'
-    status[methane > 450] = 'BLOCKAGE'
-    status[air > 600]  = 'DANGER'
-    status[methane > 700] = 'DANGER'
+    status[air > 150]  = 'MODERATE'
+    status[methane > 50] = 'MODERATE'
+    status[air > 300]  = 'BLOCKAGE'
+    status[methane > 200] = 'BLOCKAGE'
+    status[air > 500]  = 'DANGER'
+    status[methane > 1000] = 'DANGER'
     return status
 
 
@@ -78,7 +78,7 @@ def inject_sensor_noise(df: pd.DataFrame) -> pd.DataFrame:
 
     # Gas sensors (MQ-135 air quality, MQ-4 methane) — noisier
     d['air']      = (d['air']      * (1 + rng.normal(0, GAS_NOISE_STD, n))).clip(0, 1500).round(0).astype(int)
-    d['methane']  = (d['methane']  * (1 + rng.normal(0, GAS_NOISE_STD, n))).clip(0, 1500).round(0).astype(int)
+    d['methane']  = (d['methane']  * (1 + rng.normal(0, GAS_NOISE_STD, n))).clip(0, 2000).round(0).astype(int)
 
     # Environmental sensors (DHT22 temp/humidity) — more stable
     d['temp']     = (d['temp']     + rng.normal(0, 1.5, n)).clip(-10, 60).round(2)
@@ -113,8 +113,8 @@ if os.path.exists('iot_telemetry_data.csv'):
     iot_clean = pd.DataFrame({
         'temp':     iot_raw['temp'].round(2),
         'humidity': iot_raw['humidity'].round(2),
-        'air':      (iot_raw['co']    * 70_000).round(0).clip(0, 1500).astype(int),
-        'methane':  (iot_raw['smoke'] * 20_000).round(0).clip(0, 1500).astype(int),
+        'air':      ((iot_raw['co'] - 0.0011) / 0.0134 * 800).round(0).clip(0, 1500).astype(int),
+        'methane':  ((iot_raw['smoke'] - 0.0066) / 0.0400 * 1400).round(0).clip(0, 2000).astype(int),
     })
 
     # Step A: Assign threshold-based labels from pre-noise values
@@ -433,13 +433,13 @@ def predict_from_esp32(esp32_data: dict) -> str:
 
 
 test_cases = [
-    {'name': 'SAFE reading',     'data': {'temp': 24,  'humidity': 55, 'air': 100, 'methane': 150, 'distance': 90, 'flow': 10}},
-    {'name': 'MODERATE reading', 'data': {'temp': 32,  'humidity': 72, 'air': 270, 'methane': 320, 'distance': 65, 'flow': 6}},
+    {'name': 'SAFE reading',     'data': {'temp': 24,  'humidity': 55, 'air': 15,  'methane': 30,  'distance': 90, 'flow': 10}},
+    {'name': 'MODERATE reading', 'data': {'temp': 32,  'humidity': 72, 'air': 110, 'methane': 120, 'distance': 65, 'flow': 6}},
     {'name': 'BLOCKAGE reading', 'data': {'temp': 28,  'humidity': 78, 'air': 420, 'methane': 510, 'distance': 30, 'flow': 2}},
-    {'name': 'DANGER reading',   'data': {'temp': 40,  'humidity': 90, 'air': 720, 'methane': 780, 'distance': 10, 'flow': 0}},
-    # Boundary/ambiguous cases — these are where the old model was overconfident
-    {'name': 'Boundary (MOD↔BLK)',  'data': {'temp': 30, 'humidity': 65, 'air': 360, 'methane': 460, 'distance': 50, 'flow': 4}},
-    {'name': 'Boundary (SAFE↔MOD)', 'data': {'temp': 26, 'humidity': 60, 'air': 205, 'methane': 255, 'distance': 75, 'flow': 8}},
+    {'name': 'DANGER reading',   'data': {'temp': 40,  'humidity': 90, 'air': 720, 'methane': 1200,'distance': 10, 'flow': 0}},
+    # Boundary/ambiguous cases
+    {'name': 'Boundary (MOD↔BLK)',  'data': {'temp': 30, 'humidity': 65, 'air': 220, 'methane': 220, 'distance': 50, 'flow': 4}},
+    {'name': 'Boundary (SAFE↔MOD)', 'data': {'temp': 26, 'humidity': 60, 'air': 60,  'methane': 60,  'distance': 75, 'flow': 8}},
 ]
 
 print(f"\n  {'Case':<26} {'Predicted':>10}")

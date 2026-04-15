@@ -35,18 +35,18 @@ iot = iot.dropna(subset=['temp','humidity','co','smoke','lpg'])
 iot_mapped = pd.DataFrame({
     'temp':     iot['temp'].round(2),
     'humidity': iot['humidity'].round(2),
-    'air':      ((iot['co'] - 0.0011) / 0.0134 * 800).round(0).clip(0, 1500).astype(int),
+    'air':      ((iot['co'] - 0.0011) / 0.0134 * 2100 + 400).round(0).clip(400, 3000).astype(int),
     'methane':  ((iot['smoke'] - 0.0066) / 0.0400 * 1400).round(0).clip(0, 2000).astype(int),
     'distance': 60.0,                           # fixed proxy
     'flow':     (iot['lpg']   * 2000).round(2), # L/min proxy
 })
 
 def assign_status(row):
-    if row['air'] > 500 or row['methane'] > 1000:
+    if row['air'] > 2000 or row['methane'] > 1000:
         return 'DANGER'
-    elif row['air'] > 300 or row['methane'] > 200:
+    elif row['air'] > 1500 or row['methane'] > 200:
         return 'BLOCKAGE'
-    elif row['air'] > 150 or row['methane'] > 50:
+    elif row['air'] > 800 or row['methane'] > 50:
         return 'MODERATE'
     return 'SAFE'
 

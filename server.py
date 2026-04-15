@@ -129,9 +129,9 @@ def engineer_features(row: dict) -> dict:
 # Matches the zones shown in the frontend range bars (index.html).
 THRESHOLDS = {
     # Gas (calibrated delta scale 0–1500)
-    'air_moderate':      150,   # small rise above clean air, worth watching
-    'air_blockage':      300,   # meaningful air-quality degradation
-    'air_danger':        500,   # serious air quality — act soon
+    'air_moderate':      800,   # poor ventillation
+    'air_blockage':      1500,  # strong degradation
+    'air_danger':        2000,  # severe sewer gases
 
     'ch4_moderate':       50,   # detect poor ventilation
     'ch4_blockage':      200,   # high concentration/stagnant

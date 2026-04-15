@@ -47,15 +47,14 @@ void IRAM_ATTR pulseCounter() {
 unsigned long lastLoopTime = 0;
 
 // ===================================================================
-// mapSensor() — converts raw ADC to 0-2000 scale relative to
+// mapSensor() — converts raw ADC to scaled PPM relative to
 // clean-air baseline. Values at or below baseline map to 0.
-// Values above baseline scale linearly up to 2000.
 // ===================================================================
-int mapSensor(int rawValue, int cleanAirBaseline) {
+int mapSensor(int rawValue, int cleanAirBaseline, float maxMappedRange) {
   int delta = rawValue - cleanAirBaseline;
   if (delta <= 0) return 0;
   int maxDelta = 4095 - cleanAirBaseline;
-  return (int)((float)delta / maxDelta * 2000.0f);
+  return (int)((float)delta / maxDelta * maxMappedRange);
 }
 
 void setup() {
@@ -100,8 +99,8 @@ void loop() {
     return;
   #endif
 
-  int airValue     = mapSensor(rawAir,     MQ135_CLEAN_AIR_RAW);
-  int methaneValue = mapSensor(rawMethane, MQ4_CLEAN_AIR_RAW);
+  int airValue     = mapSensor(rawAir,     MQ135_CLEAN_AIR_RAW, 2600.0f) + 400; // 400ppm clean air start
+  int methaneValue = mapSensor(rawMethane, MQ4_CLEAN_AIR_RAW,   2000.0f);
 
   // ===== FLOW RATE =====
   noInterrupts();

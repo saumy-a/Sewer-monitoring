@@ -702,7 +702,7 @@ const MAX_POINTS = 20;
 ════════════════════════════════════════════════════════════════ */
 const THRESHOLDS = {
   // Gas — calibrated DELTA scale (0 = clean air baseline, 2000 = max)
-  air:      { moderate: 150, blockage: 300, danger: 500,  max: 1500 },
+  air:      { moderate: 800, blockage: 1500, danger: 2000,max: 3000 },
   methane:  { moderate: 50,  blockage: 200, danger: 1000, max: 2000 },
   // Environmental
   temp:     { moderate: 30,  danger: 38,    max: 60 },
@@ -719,7 +719,7 @@ const THRESHOLDS = {
 function getRangeZone(sensor, val) {
   if (val == null || isNaN(val)) return { zone: 'unknown', label: '—', color: '#7d8590' };
   const z = {
-    air:      val >= 500  ? 'danger' : val >= 300 ? 'blockage' : val >= 150 ? 'moderate' : 'safe',
+    air:      val >= 2000 ? 'danger' : val >= 1500? 'blockage' : val >= 800 ? 'moderate' : 'safe',
     methane:  val >= 1000 ? 'danger' : val >= 200 ? 'blockage' : val >= 50  ? 'moderate' : 'safe',
     temp:     val > 38   ? 'danger' : val > 30   ? 'moderate' : 'safe',
     humidity: val > 80   ? 'danger' : val > 65   ? 'moderate' : 'safe',
@@ -1074,10 +1074,10 @@ function setOnline(ok) {
    SIMULATE
 ════════════════════════════════════════════════════════════════ */
 const RANGES = {
-  SAFE:     { temp:[22,30], humidity:[40,65], air:[5,140],    methane:[2,40],    distance:[80,150], flow:[7,15]  },
-  MODERATE: { temp:[30,38], humidity:[65,80], air:[150,290],  methane:[50,190],  distance:[50,80],  flow:[3,6]   },
-  BLOCKAGE: { temp:[25,35], humidity:[70,85], air:[300,490],  methane:[200,900], distance:[20,50],  flow:[0.5,3] },
-  DANGER:   { temp:[38,50], humidity:[80,99], air:[500,1000], methane:[1000,1500],distance:[5,20],  flow:[0,1]   },
+  SAFE:     { temp:[22,30], humidity:[40,65], air:[400,800],   methane:[2,40],    distance:[80,150], flow:[7,15]  },
+  MODERATE: { temp:[30,38], humidity:[65,80], air:[800,1500],  methane:[50,190],  distance:[50,80],  flow:[3,6]   },
+  BLOCKAGE: { temp:[25,35], humidity:[70,85], air:[1500,1900], methane:[200,900], distance:[20,50],  flow:[0.5,3] },
+  DANGER:   { temp:[38,50], humidity:[80,99], air:[2000,2500], methane:[1000,1500],distance:[5,20],  flow:[0,1]   },
 };
 function generateReading(forceStatus) {
   const pool = ['SAFE','SAFE','SAFE','MODERATE','BLOCKAGE','DANGER'];

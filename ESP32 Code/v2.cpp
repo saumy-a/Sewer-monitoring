@@ -18,6 +18,32 @@ const char* serverName = "http://10.205.23.59:5001/data";
 #define DHTPIN      4
 #define DHTTYPE  DHT22
 
+// ===== SENSOR CALIBRATION =====
+// HOW TO FIND YOUR BASELINE:
+//   1. Power on the ESP32 in clean open air (outdoors or well-ventilated room)
+//   2. Wait at least 5 minutes for MQ sensors to warm up
+//   3. Enable CALIBRATION_MODE below (set to 1), flash, open Serial Monitor
+//   4. Watch the "RAW" values for 2-3 minutes until stable
+//   5. Set the values you see as MQ135_CLEAN_AIR_RAW and MQ4_CLEAN_AIR_RAW
+//   6. Set CALIBRATION_MODE back to 0, re-flash
+//
+// Your sensor logs showed methane mapped ~1200-1400 in open air.
+// That means MQ4 raw ADC is approximately 3270-3815 in clean air.
+// Adjust after running calibration mode.
+#define CALIBRATION_MODE      0       // set 1 to print raw ADC only
+
+#define MQ135_CLEAN_AIR_RAW   500     // replace after calibration
+#define MQ4_CLEAN_AIR_RAW     3200    // estimated from your logs (mapped ~1170 = raw ~3200)
+
+// Maps sensor reading to 0-1500 scale where 0 = clean air baseline
+// Values below baseline clamp to 0 (sensor noise / temperature drift)
+int mapSensor(int rawValue, int cleanAirBaseline) {
+  int delta = rawValue - cleanAirBaseline;
+  if (delta <= 0) return 0;  // at or below baseline → clean air
+  // Scale remaining range (baseline→4095) onto 0→1500
+  return (int)((long)delta * 1500 / (4095 - cleanAirBaseline));
+}
+
 DHT dht(DHTPIN, DHTTYPE);
 
 // ===== FLOW SENSOR =====
@@ -97,13 +123,24 @@ void loop() {
   }
 
   // ===== READ GAS =====
-  // ADC readings (0–4095 on ESP32 12-bit ADC).
-  // The server ML model was trained on scaled ppm-range values (~0–1500).
-  // FIX: map 12-bit ADC range to 0–1500 to match training data distribution.
+  // CALIBRATED mapping: subtract clean-air baseline first so that 0 = clean
+  // air and 1500 = maximum detected gas above baseline. This prevents the
+  // sensor's resting resistance in fresh air from being misread as gas.
+  // Previously: map(0,4095,0,1500) meant clean-air ADC ~3200 mapped to
+  // ~1170 ppm — far above the DANGER threshold of 700, causing false alerts.
   int rawAir     = analogRead(MQ135_PIN);
   int rawMethane = analogRead(MQ4_PIN);
-  int airValue     = map(rawAir,     0, 4095, 0, 1500);
-  int methaneValue = map(rawMethane, 0, 4095, 0, 1500);
+
+#if CALIBRATION_MODE
+  // ── CALIBRATION MODE: just print raw values, skip server POST ──────────
+  Serial.printf("[CAL] RAW MQ135: %d | RAW MQ4: %d\n", rawAir, rawMethane);
+  return;  // skip the rest of loop()
+#endif
+
+  int airValue     = mapSensor(rawAir,     MQ135_CLEAN_AIR_RAW);
+  int methaneValue = mapSensor(rawMethane, MQ4_CLEAN_AIR_RAW);
+  Serial.printf("RAW  MQ135: %d → mapped air: %d\n",     rawAir,     airValue);
+  Serial.printf("RAW  MQ4:   %d → mapped methane: %d\n", rawMethane, methaneValue);
 
   // ===== ULTRASONIC =====
   digitalWrite(TRIG_PIN, LOW);
@@ -128,7 +165,8 @@ void loop() {
   // ===== SERIAL DEBUG =====
   Serial.println("----- DATA -----");
   Serial.printf("Temp: %.1f C  |  Humidity: %.1f %%\n", temp, humidity);
-  Serial.printf("Air (mapped): %d  |  Methane (mapped): %d\n", airValue, methaneValue);
+  Serial.printf("Air   — raw:%d baseline:%d mapped:%d\n", rawAir,     MQ135_CLEAN_AIR_RAW, airValue);
+  Serial.printf("CH4   — raw:%d baseline:%d mapped:%d\n", rawMethane, MQ4_CLEAN_AIR_RAW,   methaneValue);
   Serial.printf("Distance: %.1f cm  |  Flow: %.2f L/min\n", distance, flowRate);
   Serial.printf("DHT OK: %s\n", dhtOk ? "yes" : "NO (fallback)");
 

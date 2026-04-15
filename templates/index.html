@@ -701,12 +701,16 @@ const MAX_POINTS = 20;
    THRESHOLD DEFINITIONS  (must match train_model.py)
 ════════════════════════════════════════════════════════════════ */
 const THRESHOLDS = {
-  air:      { moderate: 200, blockage: 350, danger: 600,  max: 1500 },
-  methane:  { moderate: 250, blockage: 450, danger: 700,  max: 1500 },
+  // Gas — calibrated DELTA scale (0 = clean air baseline, 1500 = max)
+  air:      { moderate: 150, blockage: 300, danger: 500,  max: 1500 },
+  methane:  { moderate: 100, blockage: 300, danger: 600,  max: 1500 },
+  // Environmental
   temp:     { moderate: 30,  danger: 38,    max: 60 },
   humidity: { moderate: 65,  danger: 80,    max: 100 },
-  distance: { danger: 20, blockage: 50, moderate: 80, max: 200 },  // lower = worse
-  flow:     { danger: 1,  blockage: 3,  moderate: 6,  max: 20 },   // lower = worse
+  // Distance — lower = worse (higher water)
+  distance: { danger: 15, blockage: 30, moderate: 60, max: 200 },
+  // Flow — lower = worse (blockage)
+  flow:     { danger: 2,  blockage: 2,  moderate: 5,  max: 20 },
 };
 
 /* ════════════════════════════════════════════════════════════════
@@ -715,12 +719,12 @@ const THRESHOLDS = {
 function getRangeZone(sensor, val) {
   if (val == null || isNaN(val)) return { zone: 'unknown', label: '—', color: '#7d8590' };
   const z = {
-    air:      val > 600 ? 'danger'   : val > 350 ? 'blockage' : val > 200 ? 'moderate' : 'safe',
-    methane:  val > 700 ? 'danger'   : val > 450 ? 'blockage' : val > 250 ? 'moderate' : 'safe',
-    temp:     val > 38  ? 'danger'   : val > 30  ? 'moderate' : 'safe',
-    humidity: val > 80  ? 'danger'   : val > 65  ? 'moderate' : 'safe',
-    distance: val < 20  ? 'danger'   : val < 50  ? 'blockage' : val < 80 ? 'moderate' : 'safe',
-    flow:     val < 1   ? 'danger'   : val < 3   ? 'blockage' : val < 6  ? 'moderate' : 'safe',
+    air:      val >= 500 ? 'danger' : val >= 300 ? 'blockage' : val >= 150 ? 'moderate' : 'safe',
+    methane:  val >= 600 ? 'danger' : val >= 300 ? 'blockage' : val >= 100 ? 'moderate' : 'safe',
+    temp:     val > 38   ? 'danger' : val > 30   ? 'moderate' : 'safe',
+    humidity: val > 80   ? 'danger' : val > 65   ? 'moderate' : 'safe',
+    distance: val < 15   ? 'danger' : val < 30   ? 'blockage' : val < 60  ? 'moderate' : 'safe',
+    flow:     val < 2    ? 'danger' : val < 2    ? 'blockage' : val < 5   ? 'moderate' : 'safe',
   }[sensor] || 'safe';
 
   const MAP = {

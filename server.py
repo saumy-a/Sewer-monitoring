@@ -116,48 +116,79 @@ def engineer_features(row: dict) -> dict:
 # ───────────────────────────────────────────────
 # FIX 6: rule-based override for clear-cut violations
 #
-# The ML model was trained without flow/distance features and
-# sometimes mislabels extreme gas readings near the training
-# data clip boundary. These hard rules correct the most common
-# failure modes and ensure physical safety constraints are
-# always respected, regardless of ML output.
+# CALIBRATION NOTE (2026-04-15):
+#   After sensor calibration the ESP32 now sends values on a delta scale:
+#     0   = clean-air baseline (sensor at rest)
+#     1500 = maximum detectable gas above baseline
+#   Thresholds below are set for this calibrated delta scale.
+#   If you change MQ135_CLEAN_AIR_RAW / MQ4_CLEAN_AIR_RAW in v2.cpp,
+#   review these numbers too.
 # ───────────────────────────────────────────────
+
+# Single source of truth for all thresholds.
+# Matches the zones shown in the frontend range bars (index.html).
+THRESHOLDS = {
+    # Gas (calibrated delta scale 0–1500)
+    'air_moderate':      150,   # small rise above clean air, worth watching
+    'air_blockage':      300,   # meaningful air-quality degradation
+    'air_danger':        500,   # serious air quality — act soon
+
+    'ch4_moderate':      100,   # trace methane detectable
+    'ch4_blockage':      300,   # elevated methane — likely decomposition
+    'ch4_danger':        600,   # high methane — evacuation risk
+
+    # Water level (distance from sensor to water surface, cm)
+    # Lower distance = higher water = worse
+    'distance_danger':    15,   # pipe nearly full or sensor submerged
+    'distance_blockage':  30,   # high water
+    'distance_moderate':  60,   # elevated water
+
+    # Flow rate (L/min)
+    # Lower flow = worse (blockage)
+    'flow_blockage':     2.0,   # almost no flow — likely blocked
+    'flow_moderate':     5.0,   # restricted flow
+}
+
+
 def rule_based_override(data: dict, ml_status: str) -> tuple[str, str]:
     """
+    Hard-threshold safety layer that runs AFTER the ML model.
     Returns (final_status, decision_source) where decision_source is
-    either 'ML' or 'RULE:<reason>'.
+    'ML' or 'RULE:<reason>'.
+
+    Priority order: DANGER > BLOCKAGE > SAFE > ML
+    The first matching rule wins.
     """
     air      = data.get('air',      0)
     methane  = data.get('methane',  0)
     distance = data.get('distance', -1.0)
     flow     = data.get('flow',     0.0)
 
-    # ── DANGER overrides (must escalate regardless of ML) ────────────
-    # Methane far above DANGER threshold (700 ppm)
-    if methane > 700:
-        return 'DANGER', f'RULE:methane={methane}ppm>700'
+    T = THRESHOLDS
 
-    # Air quality far above DANGER threshold (600 ppm)
-    if air > 600:
-        return 'DANGER', f'RULE:air={air}ppm>600'
+    # ── DANGER overrides ────────────────────────────────────────────
+    if methane >= T['ch4_danger']:
+        return 'DANGER', f'RULE:ch4={methane}>={T["ch4_danger"]}'
+    if air >= T['air_danger']:
+        return 'DANGER', f'RULE:air={air}>={T["air_danger"]}'
+    if 0 < distance <= T['distance_danger']:
+        return 'DANGER', f'RULE:distance={distance:.1f}<={T["distance_danger"]}cm'
 
-    # Water level critically high (distance < 20 cm, sensor valid)
-    if 0 < distance < 20:
-        return 'DANGER', f'RULE:distance={distance:.1f}cm<20'
+    # ── BLOCKAGE overrides ─────────────────────────────────────────
+    if 0 < distance <= T['distance_blockage']:
+        return 'BLOCKAGE', f'RULE:distance={distance:.1f}<={T["distance_blockage"]}cm'
+    if (methane >= T['ch4_blockage'] or air >= T['air_blockage']) and flow < T['flow_blockage']:
+        return 'BLOCKAGE', f'RULE:gas_elevated+flow={flow:.2f}<{T["flow_blockage"]}'
 
-    # ── BLOCKAGE override ────────────────────────────────────────────
-    # Gas elevated into blockage zone AND flow completely dead
-    if (methane > 450 or air > 350) and flow < 1.0:
-        return 'BLOCKAGE', f'RULE:gas_elevated+flow={flow:.2f}<1'
-
-    # ── SAFE override ────────────────────────────────────────────────
-    # Healthy flow + both gas sensors clearly in safe zone
-    # ML must not call this BLOCKAGE or DANGER
-    if flow >= 6.0 and air < 200 and methane < 250:
+    # ── SAFE override (correct wrong ML calls when sensors are clearly OK) ──
+    if (flow >= 5.0
+            and air  < T['air_moderate']
+            and methane < T['ch4_moderate']
+            and (distance < 0 or distance > T['distance_moderate'])):
         if ml_status in ('BLOCKAGE', 'DANGER'):
-            return 'SAFE', f'RULE:flow={flow:.2f}+gas_safe'
+            return 'SAFE', f'RULE:flow={flow:.2f}+all_sensors_ok'
 
-    # ── No override — trust the ML ───────────────────────────────────
+    # ── No override — trust the ML ───────────────────────────────
     return ml_status, 'ML'
 
 def safe_float(val, fallback=0.0):
@@ -270,6 +301,7 @@ def health():
     return jsonify({
         "model_features": TRAIN_FEATURES,
         "model_classes":  list(le.classes_),
+        "thresholds":     THRESHOLDS,
         "status": "ok"
     })
 

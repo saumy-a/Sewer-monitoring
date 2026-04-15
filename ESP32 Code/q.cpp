@@ -30,8 +30,8 @@ const char* serverName = "http://10.205.23.59:5001/data";
 //          From your logs your MQ-4 baseline is around 2800-3100.
 //          Run CALIBRATION_MODE=1 to get your exact numbers.
 // ===================================================================
-#define MQ135_CLEAN_AIR_RAW  600    // replace with YOUR observed value
-#define MQ4_CLEAN_AIR_RAW   2800    // replace with YOUR observed value
+#define MQ135_CLEAN_AIR_RAW  368    // calibrated to your room
+#define MQ4_CLEAN_AIR_RAW   1593    // calibrated to your room
 
 DHT dht(DHTPIN, DHTTYPE);
 
@@ -100,7 +100,7 @@ void loop() {
   #endif
 
   int airValue     = mapSensor(rawAir,     MQ135_CLEAN_AIR_RAW, 2600.0f) + 400; // 400ppm clean air start
-  int methaneValue = mapSensor(rawMethane, MQ4_CLEAN_AIR_RAW,   2000.0f);
+  int methaneValue = mapSensor(rawMethane, MQ4_CLEAN_AIR_RAW,   2000.0f) + 2;   // 2ppm natural methane base
 
   // ===== FLOW RATE =====
   noInterrupts();
